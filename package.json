@@ -1,0 +1,12 @@
+{
+  "name": "yaritai-app",
+  "version": "1.0.0",
+  "description": "ふたりでやりたいことを管理する共有Webアプリ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
