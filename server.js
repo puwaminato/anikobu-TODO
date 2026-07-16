@@ -10,11 +10,24 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 古い形式（done/doneBy/doneAt）のデータを status 形式に変換
+function normalizeItem(item) {
+  if (item.status) return item;
+  const { done, doneBy, doneAt, ...rest } = item;
+  return {
+    ...rest,
+    status: done ? 'done' : 'active',
+    closedBy: doneBy || null,
+    closedAt: doneAt || null,
+  };
+}
+
 function loadItems() {
   if (!fs.existsSync(DATA_FILE)) return [];
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-    return raw.trim() ? JSON.parse(raw) : [];
+    const items = raw.trim() ? JSON.parse(raw) : [];
+    return items.map(normalizeItem);
   } catch (e) {
     return [];
   }
@@ -24,18 +37,32 @@ function saveItems(items) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf-8');
 }
 
+// 未達成は期限が近い順、達成済み・頓挫は対応した日が新しい順
+function compareItems(a, b) {
+  const aActive = a.status === 'active';
+  const bActive = b.status === 'active';
+  if (aActive !== bActive) return aActive ? -1 : 1;
+  if (aActive) {
+    if (a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return b.createdAt - a.createdAt;
+  }
+  return (b.closedAt || 0) - (a.closedAt || 0);
+}
+
 // 一覧取得（viewer本人の分は private も含め、他人の private は除外）
 app.get('/api/items', (req, res) => {
   const viewer = (req.query.viewer || '').trim();
   const items = loadItems()
     .filter((i) => i.visibility !== 'private' || i.addedBy === viewer)
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort(compareItems);
   res.json(items);
 });
 
 // 追加
 app.post('/api/items', (req, res) => {
-  const { text, name, visibility } = req.body;
+  const { text, name, visibility, note, dueDate } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'text is required' });
   }
@@ -45,35 +72,40 @@ app.post('/api/items', (req, res) => {
     text: text.trim(),
     addedBy: (name || '').trim() || '匿名',
     createdAt: Date.now(),
-    done: false,
-    doneBy: null,
-    doneAt: null,
+    status: 'active',
+    closedBy: null,
+    closedAt: null,
     visibility: visibility === 'private' ? 'private' : 'shared',
+    note: (note || '').trim(),
+    dueDate: dueDate || null,
   };
   items.push(newItem);
   saveItems(items);
   res.status(201).json(newItem);
 });
 
-// 完了/未完了の切り替え
+// 状態の切り替え（active / done / abandoned）
 app.patch('/api/items/:id', (req, res) => {
   const { id } = req.params;
-  const { done, name } = req.body;
+  const { status, name } = req.body;
+  if (!['active', 'done', 'abandoned'].includes(status)) {
+    return res.status(400).json({ error: 'invalid status' });
+  }
   const items = loadItems();
   const item = items.find((i) => i.id === id);
   if (!item) return res.status(404).json({ error: 'not found' });
 
-  item.done = !!done;
-  item.doneBy = item.done ? (name || '').trim() || '匿名' : null;
-  item.doneAt = item.done ? Date.now() : null;
+  item.status = status;
+  item.closedBy = status === 'active' ? null : (name || '').trim() || '匿名';
+  item.closedAt = status === 'active' ? null : Date.now();
   saveItems(items);
   res.json(item);
 });
 
-// テキスト編集
+// 編集（本文・メモ・期限）
 app.put('/api/items/:id', (req, res) => {
   const { id } = req.params;
-  const { text } = req.body;
+  const { text, note, dueDate } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'text is required' });
   }
@@ -82,6 +114,8 @@ app.put('/api/items/:id', (req, res) => {
   if (!item) return res.status(404).json({ error: 'not found' });
 
   item.text = text.trim();
+  item.note = (note || '').trim();
+  item.dueDate = dueDate || null;
   saveItems(items);
   res.json(item);
 });
