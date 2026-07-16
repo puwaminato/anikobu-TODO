@@ -11,6 +11,10 @@
   --muted: #93939f;
   --done: #b8b8c2;
   --border: #ddf1f3;
+  --danger: #e5484d;
+  --warning: #d97706;
+  --warning-bg: #fef3e2;
+  --danger-bg: #fdecec;
 }
 
 * { box-sizing: border-box; }
@@ -207,6 +211,50 @@ header h1 {
 
 #add-form button:hover { filter: brightness(0.9); }
 
+.details-toggle {
+  display: block;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 2px;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.add-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.add-details textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.due-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.due-label input[type="date"] {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  flex: 1;
+}
+
 .private-toggle {
   display: flex;
   align-items: center;
@@ -227,6 +275,7 @@ header h1 {
 
 .filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 4px;
 }
@@ -234,7 +283,7 @@ header h1 {
 .filter-btn {
   border: 1px solid var(--border);
   background: white;
-  padding: 9px 16px;
+  padding: 9px 14px;
   min-height: 40px;
   border-radius: 999px;
   font-size: 13px;
@@ -245,6 +294,39 @@ header h1 {
 .filter-btn.active {
   background: var(--primary-dark);
   border-color: var(--primary-dark);
+  color: white;
+}
+
+.person-filters {
+  margin-top: 8px;
+}
+
+.person-filter-btn {
+  border: 1px solid var(--border);
+  background: white;
+  padding: 9px 16px;
+  min-height: 40px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.person-filter-btn.owner-はる.active {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: white;
+}
+
+.person-filter-btn.owner-みなと.active {
+  background: var(--secondary-dark);
+  border-color: var(--secondary-dark);
+  color: white;
+}
+
+.person-filter-btn:not(.owner-はる):not(.owner-みなと).active {
+  background: var(--muted);
+  border-color: var(--muted);
   color: white;
 }
 
@@ -260,15 +342,28 @@ header h1 {
 .item {
   background: var(--card);
   border-radius: 12px;
-  padding: 10px 10px 10px 14px;
+  padding: 10px 10px 10px 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  border-left: 4px solid var(--border);
 }
 
-.item.done {
+.item[data-owner="はる"] {
+  border-left-color: var(--primary);
+}
+
+.item[data-owner="みなと"] {
+  border-left-color: var(--secondary);
+}
+
+.item.closed {
   opacity: 0.65;
+}
+
+.item.abandoned {
+  border-left-style: dashed;
 }
 
 .item-checkbox-wrap {
@@ -301,7 +396,8 @@ header h1 {
   cursor: text;
 }
 
-.item.done .item-text {
+.item.done .item-text,
+.item.abandoned .item-text {
   text-decoration: line-through;
   color: var(--done);
 }
@@ -310,6 +406,37 @@ header h1 {
   font-size: 11px;
   color: var(--muted);
   margin-top: 4px;
+}
+
+.item-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.due-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-top: 5px;
+}
+
+.due-badge.soon {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-bg);
+}
+
+.due-badge.overdue {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-bg);
 }
 
 .private-badge {
@@ -347,6 +474,11 @@ header h1 {
 
 .item-actions button:hover { color: var(--primary-dark); }
 
+.abandon-btn.active {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
 #empty-msg {
   text-align: center;
   color: var(--muted);
@@ -354,10 +486,63 @@ header h1 {
   font-size: 14px;
 }
 
-.item-text-input {
+.edit-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.edit-form input[type="text"],
+.edit-form textarea,
+.edit-form input[type="date"] {
   width: 100%;
   font-size: 16px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: 1px solid var(--primary);
-  border-radius: 6px;
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.edit-form textarea {
+  resize: vertical;
+}
+
+.edit-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.edit-form-row input[type="date"] {
+  flex: 1;
+}
+
+.edit-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.edit-form-actions button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+}
+
+.edit-save-btn {
+  background: var(--primary-dark);
+  color: white;
+  font-weight: bold;
+}
+
+.edit-cancel-btn {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border) !important;
 }
