@@ -81,20 +81,6 @@ button, input {
   margin-bottom: 12px;
 }
 
-.overlay-card button {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 10px;
-  background: var(--primary-dark);
-  color: white;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.overlay-card button:hover { filter: brightness(0.9); }
-
 .name-choices {
   display: flex;
   flex-direction: column;
