@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>ふたりのやりたいことリスト</title>
+<title>やりたいことリスト</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,7 +22,7 @@
   <div class="top-bar">
     <div class="top-bar-inner">
       <header>
-        <h1>🎈 ふたりのやりたいことリスト</h1>
+        <h1>🎈 やりたいことリスト</h1>
         <div class="user-badge">
           <span id="current-name"></span>さん
           <button id="change-name" title="名前を変更">変更</button>
@@ -33,15 +33,32 @@
         <input id="add-input" type="text" placeholder="やりたいことを入力…" maxlength="200" autocomplete="off">
         <button type="submit">追加</button>
       </form>
+
+      <button type="button" id="details-toggle" class="details-toggle">＋ メモ・期限を追加</button>
+      <div id="add-details" class="add-details hidden">
+        <textarea id="add-note" placeholder="メモ（任意）" maxlength="500" rows="2"></textarea>
+        <label class="due-label">
+          期限
+          <input type="date" id="add-due">
+        </label>
+      </div>
+
       <label class="private-toggle">
         <input type="checkbox" id="private-checkbox">
         🔒 自分だけに表示（相手には見えません）
       </label>
 
       <div class="filters">
-        <button class="filter-btn active" data-filter="all">すべて</button>
-        <button class="filter-btn" data-filter="active">未達成</button>
+        <button class="filter-btn" data-filter="all">すべて</button>
+        <button class="filter-btn active" data-filter="active">未達成</button>
         <button class="filter-btn" data-filter="done">達成済み</button>
+        <button class="filter-btn" data-filter="abandoned">頓挫</button>
+      </div>
+
+      <div class="filters person-filters">
+        <button class="person-filter-btn active" data-person="all">ふたり</button>
+        <button class="person-filter-btn owner-はる" data-person="はる">はる</button>
+        <button class="person-filter-btn owner-みなと" data-person="みなと">みなと</button>
       </div>
     </div>
   </div>
