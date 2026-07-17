@@ -34,9 +34,37 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// タップ位置に波紋を出す（録画時などにタップ箇所が分かるように）
+function spawnRipple(x, y, size) {
+  const ripple = document.createElement('span');
+  ripple.className = 'tap-ripple';
+  ripple.style.width = size + 'px';
+  ripple.style.height = size + 'px';
+  ripple.style.left = x - size / 2 + 'px';
+  ripple.style.top = y - size / 2 + 'px';
+  document.body.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const target = e.target.closest('button, .item-checkbox-wrap');
+  if (!target) return;
+  const rect = target.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 1.3;
+  spawnRipple(e.clientX, e.clientY, size);
+});
+
+// 画面・一覧が切り替わる時にフェードインさせる
+function triggerFadeIn(el) {
+  el.classList.remove('fade-in');
+  void el.offsetWidth;
+  el.classList.add('fade-in');
+}
+
 function showApp() {
   nameGate.classList.add('hidden');
   appEl.classList.remove('hidden');
+  triggerFadeIn(appEl);
   currentNameEl.textContent = myName;
   fetchItems();
   if (!pollTimer) {
@@ -47,6 +75,7 @@ function showApp() {
 function showNameGate() {
   appEl.classList.add('hidden');
   nameGate.classList.remove('hidden');
+  triggerFadeIn(nameGate);
 }
 
 nameChoiceBtns.forEach((btn) => {
@@ -137,6 +166,7 @@ filterBtns.forEach((btn) => {
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
     render();
+    triggerFadeIn(itemList);
   });
 });
 
@@ -146,6 +176,7 @@ personFilterBtns.forEach((btn) => {
     btn.classList.add('active');
     currentPerson = btn.dataset.person;
     render();
+    triggerFadeIn(itemList);
   });
 });
 
