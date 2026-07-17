@@ -37,6 +37,43 @@ button, input {
   -webkit-tap-highlight-color: transparent;
 }
 
+button, .item-checkbox-wrap {
+  transition: transform 100ms ease;
+}
+
+button:active, .item-checkbox-wrap:active {
+  transform: scale(0.92);
+}
+
+/* タップした位置に広がる波紋（録画などでタップ箇所が分かるように） */
+.tap-ripple {
+  position: fixed;
+  border-radius: 50%;
+  background: rgba(16, 120, 132, 0.35);
+  transform: scale(0);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 9999;
+  animation: tap-ripple-anim 450ms ease-out forwards;
+}
+
+@keyframes tap-ripple-anim {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* 画面・一覧の切り替え時のフェードイン */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 220ms ease;
+}
+
 .hidden { display: none !important; }
 
 /* 名前入力オーバーレイ */
@@ -289,6 +326,7 @@ header h1 {
   font-size: 13px;
   cursor: pointer;
   color: var(--muted);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
 .filter-btn.active {
@@ -310,6 +348,7 @@ header h1 {
   font-size: 13px;
   cursor: pointer;
   color: var(--muted);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
 .person-filter-btn.owner-はる.active {
