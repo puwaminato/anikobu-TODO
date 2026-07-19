@@ -40,6 +40,7 @@ let pollTimer = null;
 let editingId = null;
 let expandedIds = new Set();
 let searchQuery = '';
+let commentInputFocused = false;
 let calendarMode = false;
 let calendarMonth = new Date();
 calendarMonth.setDate(1);
@@ -72,6 +73,19 @@ document.addEventListener('pointerdown', (e) => {
   const rect = target.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 1.3;
   spawnRipple(e.clientX, e.clientY, size);
+});
+
+// コメント入力中は自動更新で入力欄が消えてキーボードが閉じないようにする
+document.addEventListener('focusin', (e) => {
+  if (e.target.classList.contains('comment-input')) {
+    commentInputFocused = true;
+  }
+});
+
+document.addEventListener('focusout', (e) => {
+  if (e.target.classList.contains('comment-input')) {
+    commentInputFocused = false;
+  }
 });
 
 // タスク達成時のちょっとした祝福エフェクト
@@ -168,7 +182,9 @@ async function fetchItems() {
   try {
     const res = await fetch('/api/items?viewer=' + encodeURIComponent(myName));
     items = await res.json();
-    renderCurrentView();
+    if (!commentInputFocused) {
+      renderCurrentView();
+    }
   } catch (e) {
     console.error('取得失敗', e);
   }
