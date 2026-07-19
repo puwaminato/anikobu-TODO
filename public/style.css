@@ -732,6 +732,23 @@ header h1 {
 }
 
 /* カレンダー */
+.calendar-close-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.calendar-close-row button {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
 .calendar-header {
   display: flex;
   align-items: center;
