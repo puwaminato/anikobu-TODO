@@ -64,6 +64,24 @@ button:active, .item-checkbox-wrap:active {
   }
 }
 
+/* タスク達成時のちょっとした祝福エフェクト */
+.celebrate-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 16px;
+  transform: translate(0, 0) scale(1);
+  opacity: 1;
+  animation: celebrate-burst 700ms ease-out forwards;
+}
+
+@keyframes celebrate-burst {
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.4);
+    opacity: 0;
+  }
+}
+
 /* 画面・一覧の切り替え時のフェードイン */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -374,6 +392,18 @@ header h1 {
   color: white;
 }
 
+.search-box {
+  margin-top: 10px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+}
+
 #item-list {
   list-style: none;
   margin: 4px 0 0;
@@ -479,6 +509,97 @@ header h1 {
   width: 16px;
   height: 16px;
   accent-color: var(--secondary);
+}
+
+.comment-count {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+  margin-left: 6px;
+}
+
+.comment-thread {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment {
+  background: var(--bg);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.comment[data-owner="はる"] {
+  border-left-color: var(--primary);
+}
+
+.comment[data-owner="みなと"] {
+  border-left-color: var(--secondary);
+}
+
+.comment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.comment-author {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.comment-time {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.comment-text {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 2px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.comment-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0;
+}
+
+.comment-form {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.comment-form button {
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--secondary-dark);
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .item-note {
