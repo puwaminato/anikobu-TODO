@@ -38,6 +38,15 @@ async function initDb() {
       due_date TEXT
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      author TEXT NOT NULL,
+      text TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )
+  `);
 }
 
 function rowToItem(row) {
@@ -55,11 +64,21 @@ function rowToItem(row) {
   };
 }
 
+function rowToComment(row) {
+  return {
+    id: row.id,
+    author: row.author,
+    text: row.text,
+    createdAt: Number(row.created_at),
+  };
+}
+
 // ---- ファイル保存（DATABASE_URL 未設定時のローカル動作用） ----
 function normalizeItem(item) {
-  if (item.status) return item;
+  if (item.status) return { comments: [], ...item };
   const { done, doneBy, doneAt, ...rest } = item;
   return {
+    comments: [],
     ...rest,
     status: done ? 'done' : 'active',
     closedBy: doneBy || null,
@@ -86,7 +105,17 @@ function saveItemsToFile(items) {
 async function getAllItems() {
   if (pool) {
     const { rows } = await pool.query('SELECT * FROM items');
-    return rows.map(rowToItem);
+    const items = rows.map(rowToItem);
+    const { rows: commentRows } = await pool.query('SELECT * FROM comments ORDER BY created_at ASC');
+    const commentsByItem = {};
+    for (const cr of commentRows) {
+      if (!commentsByItem[cr.item_id]) commentsByItem[cr.item_id] = [];
+      commentsByItem[cr.item_id].push(rowToComment(cr));
+    }
+    for (const item of items) {
+      item.comments = commentsByItem[item.id] || [];
+    }
+    return items;
   }
   return loadItemsFromFile();
 }
@@ -103,6 +132,24 @@ async function insertItem(item) {
   const items = loadItemsFromFile();
   items.push(item);
   saveItemsToFile(items);
+}
+
+async function addCommentToItem(itemId, author, text) {
+  const comment = { id: crypto.randomUUID(), author, text, createdAt: Date.now() };
+  if (pool) {
+    await pool.query(
+      `INSERT INTO comments (id, item_id, author, text, created_at) VALUES ($1,$2,$3,$4,$5)`,
+      [comment.id, itemId, comment.author, comment.text, comment.createdAt]
+    );
+    return comment;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === itemId);
+  if (!item) return null;
+  if (!item.comments) item.comments = [];
+  item.comments.push(comment);
+  saveItemsToFile(items);
+  return comment;
 }
 
 async function updateItemStatus(id, status, closedBy, closedAt) {
@@ -209,6 +256,7 @@ app.post('/api/items', async (req, res) => {
     visibility: visibility === 'private' ? 'private' : 'shared',
     note: (note || '').trim(),
     dueDate: dueDate || null,
+    comments: [],
   };
   await insertItem(newItem);
   res.status(201).json(newItem);
@@ -260,6 +308,22 @@ app.delete('/api/items/:id', async (req, res) => {
   const ok = await removeItem(id);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
+});
+
+// コメント（返信）を追加
+app.post('/api/items/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const { text, name } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'text is required' });
+  }
+  if (pool) {
+    const { rows } = await pool.query('SELECT id FROM items WHERE id=$1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'not found' });
+  }
+  const comment = await addCommentToItem(id, (name || '').trim() || '匿名', text.trim());
+  if (!comment) return res.status(404).json({ error: 'not found' });
+  res.status(201).json(comment);
 });
 
 initDb()
