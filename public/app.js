@@ -21,6 +21,7 @@ const searchInput = document.getElementById('search-input');
 
 const calendarToggleBtn = document.getElementById('calendar-toggle');
 const calendarView = document.getElementById('calendar-view');
+const calCloseBtn = document.getElementById('cal-close');
 const calPrevBtn = document.getElementById('cal-prev');
 const calNextBtn = document.getElementById('cal-next');
 const calMonthLabel = document.getElementById('cal-month-label');
@@ -155,28 +156,39 @@ function renderCurrentView() {
   }
 }
 
+function openCalendar() {
+  calendarMode = true;
+  listControls.classList.add('hidden');
+  itemList.classList.add('hidden');
+  emptyMsg.classList.add('hidden');
+  calendarView.classList.remove('hidden');
+  calendarToggleBtn.textContent = '📋';
+  calendarToggleBtn.title = '一覧に戻る';
+  triggerFadeIn(calendarView);
+  renderCalendar();
+  renderDayPanel();
+}
+
+function closeCalendar() {
+  calendarMode = false;
+  calendarView.classList.add('hidden');
+  listControls.classList.remove('hidden');
+  itemList.classList.remove('hidden');
+  calendarToggleBtn.textContent = '📅';
+  calendarToggleBtn.title = 'カレンダー';
+  triggerFadeIn(itemList);
+  render();
+}
+
 calendarToggleBtn.addEventListener('click', () => {
-  calendarMode = !calendarMode;
   if (calendarMode) {
-    listControls.classList.add('hidden');
-    itemList.classList.add('hidden');
-    emptyMsg.classList.add('hidden');
-    calendarView.classList.remove('hidden');
-    calendarToggleBtn.textContent = '📋';
-    calendarToggleBtn.title = '一覧に戻る';
-    triggerFadeIn(calendarView);
-    renderCalendar();
-    renderDayPanel();
+    closeCalendar();
   } else {
-    calendarView.classList.add('hidden');
-    listControls.classList.remove('hidden');
-    itemList.classList.remove('hidden');
-    calendarToggleBtn.textContent = '📅';
-    calendarToggleBtn.title = 'カレンダー';
-    triggerFadeIn(itemList);
-    render();
+    openCalendar();
   }
 });
+
+calCloseBtn.addEventListener('click', closeCalendar);
 
 async function fetchItems() {
   try {
