@@ -25,40 +25,43 @@
         <h1>🎈 やりたいことリスト</h1>
         <div class="user-badge">
           <span id="current-name"></span>さん
+          <button id="calendar-toggle" title="カレンダー">📅</button>
           <button id="change-name" title="名前を変更">変更</button>
         </div>
       </header>
 
-      <form id="add-form">
-        <input id="add-input" type="text" placeholder="やりたいことを入力…" maxlength="200" autocomplete="off">
-        <button type="submit">追加</button>
-      </form>
+      <div id="list-controls">
+        <form id="add-form">
+          <input id="add-input" type="text" placeholder="やりたいことを入力…" maxlength="200" autocomplete="off">
+          <button type="submit">追加</button>
+        </form>
 
-      <button type="button" id="details-toggle" class="details-toggle">＋ メモ・期限を追加</button>
-      <div id="add-details" class="add-details hidden">
-        <textarea id="add-note" placeholder="メモ（任意）" maxlength="500" rows="2"></textarea>
-        <label class="due-label">
-          期限
-          <input type="date" id="add-due">
+        <button type="button" id="details-toggle" class="details-toggle">＋ メモ・期限を追加</button>
+        <div id="add-details" class="add-details hidden">
+          <textarea id="add-note" placeholder="メモ（任意）" maxlength="500" rows="2"></textarea>
+          <label class="due-label">
+            期限
+            <input type="date" id="add-due">
+          </label>
+        </div>
+
+        <label class="private-toggle">
+          <input type="checkbox" id="private-checkbox">
+          🔒 自分だけに表示（相手には見えません）
         </label>
-      </div>
 
-      <label class="private-toggle">
-        <input type="checkbox" id="private-checkbox">
-        🔒 自分だけに表示（相手には見えません）
-      </label>
+        <div class="filters">
+          <button class="filter-btn" data-filter="all">すべて</button>
+          <button class="filter-btn active" data-filter="active">未達成</button>
+          <button class="filter-btn" data-filter="done">達成済み</button>
+          <button class="filter-btn" data-filter="abandoned">頓挫</button>
+        </div>
 
-      <div class="filters">
-        <button class="filter-btn" data-filter="all">すべて</button>
-        <button class="filter-btn active" data-filter="active">未達成</button>
-        <button class="filter-btn" data-filter="done">達成済み</button>
-        <button class="filter-btn" data-filter="abandoned">頓挫</button>
-      </div>
-
-      <div class="filters person-filters">
-        <button class="person-filter-btn active" data-person="all">ふたり</button>
-        <button class="person-filter-btn owner-はる" data-person="はる">はる</button>
-        <button class="person-filter-btn owner-みなと" data-person="みなと">みなと</button>
+        <div class="filters person-filters">
+          <button class="person-filter-btn active" data-person="all">ふたり</button>
+          <button class="person-filter-btn owner-はる" data-person="はる">はる</button>
+          <button class="person-filter-btn owner-みなと" data-person="みなと">みなと</button>
+        </div>
       </div>
     </div>
   </div>
@@ -66,6 +69,23 @@
   <ul id="item-list"></ul>
 
   <p id="empty-msg" class="hidden">まだ何もありません。やりたいことを追加してみましょう！</p>
+
+  <div id="calendar-view" class="hidden">
+    <div class="calendar-header">
+      <button type="button" id="cal-prev">‹</button>
+      <div id="cal-month-label"></div>
+      <button type="button" id="cal-next">›</button>
+    </div>
+    <div id="calendar-grid" class="calendar-grid"></div>
+    <div id="calendar-day-panel" class="calendar-day-panel hidden">
+      <h3 id="cal-day-title"></h3>
+      <ul id="cal-day-items"></ul>
+      <form id="cal-day-add-form">
+        <input type="text" id="cal-day-add-input" placeholder="この日にやりたいことを追加…" maxlength="200" autocomplete="off">
+        <button type="submit">追加</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script src="app.js"></script>
