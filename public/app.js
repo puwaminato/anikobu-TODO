@@ -17,6 +17,7 @@ const emptyMsg = document.getElementById('empty-msg');
 const filterBtns = document.querySelectorAll('.filter-btn');
 const personFilterBtns = document.querySelectorAll('.person-filter-btn');
 const listControls = document.getElementById('list-controls');
+const searchInput = document.getElementById('search-input');
 
 const calendarToggleBtn = document.getElementById('calendar-toggle');
 const calendarView = document.getElementById('calendar-view');
@@ -38,6 +39,7 @@ let currentPerson = 'all';
 let pollTimer = null;
 let editingId = null;
 let expandedIds = new Set();
+let searchQuery = '';
 let calendarMode = false;
 let calendarMonth = new Date();
 calendarMonth.setDate(1);
@@ -71,6 +73,25 @@ document.addEventListener('pointerdown', (e) => {
   const size = Math.max(rect.width, rect.height) * 1.3;
   spawnRipple(e.clientX, e.clientY, size);
 });
+
+// タスク達成時のちょっとした祝福エフェクト
+const CELEBRATE_EMOJIS = ['✨', '🎉', '⭐', '💫'];
+
+function celebrate(x, y) {
+  for (let i = 0; i < 10; i++) {
+    const p = document.createElement('span');
+    p.className = 'celebrate-particle';
+    p.textContent = CELEBRATE_EMOJIS[Math.floor(Math.random() * CELEBRATE_EMOJIS.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 40 + Math.random() * 40;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+    document.body.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());
+  }
+}
 
 // 画面・一覧が切り替わる時にフェードインさせる
 function triggerFadeIn(el) {
@@ -206,6 +227,21 @@ async function deleteItem(id) {
   renderCurrentView();
 }
 
+async function addComment(itemId, text) {
+  const res = await fetch(`/api/items/${itemId}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, name: myName }),
+  });
+  const comment = await res.json();
+  const item = items.find((i) => i.id === itemId);
+  if (item) {
+    if (!item.comments) item.comments = [];
+    item.comments.push(comment);
+  }
+  renderCurrentView();
+}
+
 addForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const text = addInput.value.trim();
@@ -242,6 +278,11 @@ personFilterBtns.forEach((btn) => {
   });
 });
 
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  render();
+});
+
 function formatDate(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -275,6 +316,32 @@ function dueBadgeHtml(item) {
   return `<span class="due-badge ${cls}">📅 ${label} ${formatDueDate(item.dueDate)}</span>`;
 }
 
+function commentsHtml(item) {
+  const comments = item.comments || [];
+  const list = comments
+    .map(
+      (c) => `
+        <div class="comment" data-owner="${escapeHtml(c.author)}">
+          <div class="comment-head">
+            <span class="comment-author">${escapeHtml(c.author)}</span>
+            <span class="comment-time">${formatDate(c.createdAt)}</span>
+          </div>
+          <div class="comment-text">${escapeHtml(c.text)}</div>
+        </div>
+      `
+    )
+    .join('');
+  return `
+    <div class="comment-thread">
+      ${list || '<div class="comment-empty">まだコメントはありません</div>'}
+      <form class="comment-form" data-item-id="${escapeHtml(item.id)}">
+        <input type="text" class="comment-input" placeholder="返信を入力…" maxlength="300" autocomplete="off">
+        <button type="submit">送信</button>
+      </form>
+    </div>
+  `;
+}
+
 function itemExpandHtml(item) {
   if (!expandedIds.has(item.id)) return '';
   const addedLine = `追加: ${escapeHtml(item.addedBy)} (${formatDate(item.createdAt)})`;
@@ -292,8 +359,14 @@ function itemExpandHtml(item) {
         <input type="checkbox" class="visibility-checkbox" ${item.visibility === 'private' ? 'checked' : ''}>
         🔒 自分だけに表示（相手には見えません）
       </label>
+      ${commentsHtml(item)}
     </div>
   `;
+}
+
+function commentCountHtml(item) {
+  const count = (item.comments || []).length;
+  return count ? `<span class="comment-count">💬 ${count}</span>` : '';
 }
 
 function itemToHtml(item) {
@@ -311,6 +384,7 @@ function itemToHtml(item) {
         <div class="item-text">${lockIcon}${escapeHtml(item.text)}</div>
         ${noteHtml}
         ${dueBadgeHtml(item)}
+        ${commentCountHtml(item)}
         ${itemExpandHtml(item)}
       </div>
       <div class="item-actions">
@@ -328,8 +402,16 @@ function render() {
   let filtered = items;
   if (currentFilter !== 'all') filtered = filtered.filter((i) => i.status === currentFilter);
   if (currentPerson !== 'all') filtered = filtered.filter((i) => i.addedBy === currentPerson);
+  if (searchQuery) {
+    filtered = filtered.filter(
+      (i) => i.text.toLowerCase().includes(searchQuery) || (i.note && i.note.toLowerCase().includes(searchQuery))
+    );
+  }
 
   emptyMsg.classList.toggle('hidden', filtered.length > 0);
+  emptyMsg.textContent = searchQuery
+    ? `「${searchInput.value.trim()}」に一致するタスクが見つかりません`
+    : 'まだ何もありません。やりたいことを追加してみましょう！';
 
   itemList.innerHTML = filtered.map(itemToHtml).join('');
 }
@@ -340,6 +422,10 @@ function handleItemClick(e) {
   const id = li.dataset.id;
 
   if (e.target.classList.contains('item-checkbox')) {
+    if (e.target.checked) {
+      const rect = e.target.getBoundingClientRect();
+      celebrate(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
     setStatus(id, e.target.checked ? 'done' : 'active');
   } else if (e.target.classList.contains('item-text')) {
     if (expandedIds.has(id)) expandedIds.delete(id);
@@ -359,6 +445,21 @@ function handleItemClick(e) {
 
 itemList.addEventListener('click', handleItemClick);
 calDayItems.addEventListener('click', handleItemClick);
+
+function handleCommentSubmit(e) {
+  const form = e.target.closest('.comment-form');
+  if (!form) return;
+  e.preventDefault();
+  const itemId = form.dataset.itemId;
+  const input = form.querySelector('.comment-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addComment(itemId, text);
+}
+
+itemList.addEventListener('submit', handleCommentSubmit);
+calDayItems.addEventListener('submit', handleCommentSubmit);
 
 function startEdit(li, id) {
   const item = items.find((i) => i.id === id);
