@@ -416,7 +416,7 @@ function itemToHtml(item) {
         ${itemExpandHtml(item)}
       </div>
       <div class="item-actions">
-        <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🏳️</button>
+        <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
         <button class="edit-btn" title="編集">✏️</button>
         <button class="delete-btn" title="削除">🗑️</button>
       </div>
