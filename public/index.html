@@ -25,8 +25,8 @@
         <h1>🎈 やりたいことリスト</h1>
         <div class="user-badge">
           <span id="current-name"></span>さん
-          <button id="calendar-toggle" title="カレンダー">📅</button>
           <button id="change-name" title="名前を変更">変更</button>
+          <button id="calendar-toggle" title="カレンダー">📅</button>
         </div>
       </header>
 
@@ -75,6 +75,9 @@
   <p id="empty-msg" class="hidden">まだ何もありません。やりたいことを追加してみましょう！</p>
 
   <div id="calendar-view" class="hidden">
+    <div class="calendar-close-row">
+      <button type="button" id="cal-close" title="閉じる">✕</button>
+    </div>
     <div class="calendar-header">
       <button type="button" id="cal-prev">‹</button>
       <div id="cal-month-label"></div>
