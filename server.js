@@ -141,6 +141,22 @@ async function updateItemContent(id, text, note, dueDate) {
   return item;
 }
 
+async function updateItemVisibility(id, visibility) {
+  if (pool) {
+    const { rows } = await pool.query(
+      `UPDATE items SET visibility=$2 WHERE id=$1 RETURNING *`,
+      [id, visibility]
+    );
+    return rows[0] ? rowToItem(rows[0]) : null;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === id);
+  if (!item) return null;
+  item.visibility = visibility;
+  saveItemsToFile(items);
+  return item;
+}
+
 async function removeItem(id) {
   if (pool) {
     const { rowCount } = await pool.query('DELETE FROM items WHERE id=$1', [id]);
@@ -198,18 +214,32 @@ app.post('/api/items', async (req, res) => {
   res.status(201).json(newItem);
 });
 
-// 状態の切り替え（active / done / abandoned）
+// 状態（active / done / abandoned）または公開範囲（shared / private）の切り替え
 app.patch('/api/items/:id', async (req, res) => {
   const { id } = req.params;
-  const { status, name } = req.body;
-  if (!['active', 'done', 'abandoned'].includes(status)) {
-    return res.status(400).json({ error: 'invalid status' });
+  const { status, visibility, name } = req.body;
+
+  if (status !== undefined) {
+    if (!['active', 'done', 'abandoned'].includes(status)) {
+      return res.status(400).json({ error: 'invalid status' });
+    }
+    const closedBy = status === 'active' ? null : (name || '').trim() || '匿名';
+    const closedAt = status === 'active' ? null : Date.now();
+    const updated = await updateItemStatus(id, status, closedBy, closedAt);
+    if (!updated) return res.status(404).json({ error: 'not found' });
+    return res.json(updated);
   }
-  const closedBy = status === 'active' ? null : (name || '').trim() || '匿名';
-  const closedAt = status === 'active' ? null : Date.now();
-  const updated = await updateItemStatus(id, status, closedBy, closedAt);
-  if (!updated) return res.status(404).json({ error: 'not found' });
-  res.json(updated);
+
+  if (visibility !== undefined) {
+    if (!['shared', 'private'].includes(visibility)) {
+      return res.status(400).json({ error: 'invalid visibility' });
+    }
+    const updated = await updateItemVisibility(id, visibility);
+    if (!updated) return res.status(404).json({ error: 'not found' });
+    return res.json(updated);
+  }
+
+  res.status(400).json({ error: 'status or visibility is required' });
 });
 
 // 編集（本文・メモ・期限）
