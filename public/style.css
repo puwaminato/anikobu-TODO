@@ -638,7 +638,8 @@ header h1 {
   flex-shrink: 0;
 }
 
-.item-actions button {
+.item-actions button,
+.item-actions a {
   border: none;
   background: transparent;
   cursor: pointer;
@@ -650,13 +651,16 @@ header h1 {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  text-decoration: none;
 }
 
-.item-actions button:active {
+.item-actions button:active,
+.item-actions a:active {
   background: var(--bg);
 }
 
-.item-actions button:hover { color: var(--primary-dark); }
+.item-actions button:hover,
+.item-actions a:hover { color: var(--primary-dark); }
 
 .abandon-btn.active {
   background: var(--warning-bg);
