@@ -403,6 +403,11 @@ function commentCountHtml(item) {
   return count ? `<span class="comment-count">💬 ${count}</span>` : '';
 }
 
+function calAddBtnHtml(item) {
+  if (!item.dueDate) return '';
+  return `<a class="cal-add-btn" href="/api/items/${encodeURIComponent(item.id)}/ics" title="iPhoneカレンダーに追加">📆</a>`;
+}
+
 function itemToHtml(item) {
   const lockIcon = item.visibility === 'private' ? '<span class="lock-icon">🔒</span>' : '';
   const noteHtml = item.note ? `<div class="item-note">📝 ${escapeHtml(item.note)}</div>` : '';
@@ -422,6 +427,7 @@ function itemToHtml(item) {
         ${itemExpandHtml(item)}
       </div>
       <div class="item-actions">
+        ${calAddBtnHtml(item)}
         <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
         <button class="edit-btn" title="編集">✏️</button>
         <button class="delete-btn" title="削除">🗑️</button>
