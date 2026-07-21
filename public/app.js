@@ -379,14 +379,20 @@ function itemExpandHtml(item) {
   } else if (item.status === 'abandoned') {
     closedLine = `<div class="item-meta">頓挫: ${escapeHtml(item.closedBy || '')}さん (${formatDate(item.closedAt)})</div>`;
   }
-  return `
-    <div class="item-expand">
-      <div class="item-meta">${addedLine}</div>
-      ${closedLine}
+  const visibilityToggle =
+    item.addedBy === myName
+      ? `
       <label class="visibility-toggle">
         <input type="checkbox" class="visibility-checkbox" ${item.visibility === 'private' ? 'checked' : ''}>
         🔒 自分だけに表示（相手には見えません）
       </label>
+    `
+      : '';
+  return `
+    <div class="item-expand">
+      <div class="item-meta">${addedLine}</div>
+      ${closedLine}
+      ${visibilityToggle}
       ${commentsHtml(item)}
     </div>
   `;
