@@ -216,6 +216,45 @@ async function removeItem(id) {
   return true;
 }
 
+// ---- iPhoneカレンダー登録用の .ics ファイル生成 ----
+function icsEscape(str) {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function icsDateOf(dueDate) {
+  return dueDate.replace(/-/g, '');
+}
+
+// 終日イベントの DTEND は「翌日」を指定する仕様のため+1日する
+function icsNextDayOf(dueDate) {
+  const [y, m, d] = dueDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${dt.getUTCFullYear()}${String(dt.getUTCMonth() + 1).padStart(2, '0')}${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+function buildIcs(item) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//yaritai-list//JP',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${item.id}@anikobu-todo`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${icsDateOf(item.dueDate)}`,
+    `DTEND;VALUE=DATE:${icsNextDayOf(item.dueDate)}`,
+    `SUMMARY:${icsEscape(item.text)}`,
+  ];
+  if (item.note) lines.push(`DESCRIPTION:${icsEscape(item.note)}`);
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return lines.join('\r\n') + '\r\n';
+}
+
 // 未達成は期限が近い順、達成済み・頓挫は対応した日が新しい順
 function compareItems(a, b) {
   const aActive = a.status === 'active';
@@ -308,6 +347,17 @@ app.delete('/api/items/:id', async (req, res) => {
   const ok = await removeItem(id);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
+});
+
+// iPhoneカレンダーに追加できる .ics ファイルを返す（期限があるタスクのみ）
+app.get('/api/items/:id/ics', async (req, res) => {
+  const { id } = req.params;
+  const items = await getAllItems();
+  const item = items.find((i) => i.id === id);
+  if (!item || !item.dueDate) return res.status(404).send('not found');
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="event.ics"');
+  res.send(buildIcs(item));
 });
 
 // コメント（返信）を追加
