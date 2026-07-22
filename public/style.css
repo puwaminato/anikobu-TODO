@@ -550,6 +550,12 @@ header h1 {
   gap: 8px;
 }
 
+.comment-head-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .comment-author {
   font-size: 12px;
   font-weight: bold;
@@ -562,12 +568,79 @@ header h1 {
   flex-shrink: 0;
 }
 
+.comment-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.comment-actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.comment-actions button:active {
+  background: var(--bg);
+}
+
 .comment-text {
   font-size: 13px;
   color: var(--text);
   margin-top: 2px;
   word-break: break-word;
   white-space: pre-wrap;
+}
+
+.comment-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.comment-edit-form input {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.comment-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.comment-edit-actions button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  border: none;
+}
+
+.comment-edit-save-btn {
+  background: var(--primary-dark);
+  color: white;
+  font-weight: bold;
+}
+
+.comment-edit-cancel-btn {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border) !important;
 }
 
 .comment-empty {
