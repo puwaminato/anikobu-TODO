@@ -152,6 +152,42 @@ async function addCommentToItem(itemId, author, text) {
   return comment;
 }
 
+async function updateComment(itemId, commentId, text) {
+  if (pool) {
+    const { rows } = await pool.query(
+      `UPDATE comments SET text=$2 WHERE id=$1 AND item_id=$3 RETURNING *`,
+      [commentId, text, itemId]
+    );
+    return rows[0] ? rowToComment(rows[0]) : null;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === itemId);
+  if (!item || !item.comments) return null;
+  const comment = item.comments.find((c) => c.id === commentId);
+  if (!comment) return null;
+  comment.text = text;
+  saveItemsToFile(items);
+  return comment;
+}
+
+async function removeComment(itemId, commentId) {
+  if (pool) {
+    const { rowCount } = await pool.query(
+      `DELETE FROM comments WHERE id=$1 AND item_id=$2`,
+      [commentId, itemId]
+    );
+    return rowCount > 0;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === itemId);
+  if (!item || !item.comments) return false;
+  const before = item.comments.length;
+  item.comments = item.comments.filter((c) => c.id !== commentId);
+  if (item.comments.length === before) return false;
+  saveItemsToFile(items);
+  return true;
+}
+
 async function updateItemStatus(id, status, closedBy, closedAt) {
   if (pool) {
     const { rows } = await pool.query(
@@ -374,6 +410,26 @@ app.post('/api/items/:id/comments', async (req, res) => {
   const comment = await addCommentToItem(id, (name || '').trim() || '匿名', text.trim());
   if (!comment) return res.status(404).json({ error: 'not found' });
   res.status(201).json(comment);
+});
+
+// コメント編集
+app.put('/api/items/:id/comments/:commentId', async (req, res) => {
+  const { id, commentId } = req.params;
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'text is required' });
+  }
+  const updated = await updateComment(id, commentId, text.trim());
+  if (!updated) return res.status(404).json({ error: 'not found' });
+  res.json(updated);
+});
+
+// コメント削除
+app.delete('/api/items/:id/comments/:commentId', async (req, res) => {
+  const { id, commentId } = req.params;
+  const ok = await removeComment(id, commentId);
+  if (!ok) return res.status(404).json({ error: 'not found' });
+  res.status(204).end();
 });
 
 initDb()
