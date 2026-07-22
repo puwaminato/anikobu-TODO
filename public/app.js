@@ -270,6 +270,30 @@ async function addComment(itemId, text) {
   renderCurrentView();
 }
 
+async function editComment(itemId, commentId, text) {
+  const res = await fetch(`/api/items/${itemId}/comments/${commentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  const updated = await res.json();
+  const item = items.find((i) => i.id === itemId);
+  if (item && item.comments) {
+    const idx = item.comments.findIndex((c) => c.id === commentId);
+    if (idx !== -1) item.comments[idx] = updated;
+  }
+  renderCurrentView();
+}
+
+async function deleteComment(itemId, commentId) {
+  await fetch(`/api/items/${itemId}/comments/${commentId}`, { method: 'DELETE' });
+  const item = items.find((i) => i.id === itemId);
+  if (item && item.comments) {
+    item.comments = item.comments.filter((c) => c.id !== commentId);
+  }
+  renderCurrentView();
+}
+
 addForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const text = addInput.value.trim();
@@ -349,10 +373,21 @@ function commentsHtml(item) {
   const list = comments
     .map(
       (c) => `
-        <div class="comment" data-owner="${escapeHtml(c.author)}">
+        <div class="comment" data-owner="${escapeHtml(c.author)}" data-comment-id="${escapeHtml(c.id)}">
           <div class="comment-head">
-            <span class="comment-author">${escapeHtml(c.author)}</span>
-            <span class="comment-time">${formatDate(c.createdAt)}</span>
+            <div class="comment-head-info">
+              <span class="comment-author">${escapeHtml(c.author)}</span>
+              <span class="comment-time">${formatDate(c.createdAt)}</span>
+            </div>
+            ${
+              c.author === myName
+                ? `
+            <span class="comment-actions">
+              <button type="button" class="comment-edit-btn" title="編集">✏️</button>
+              <button type="button" class="comment-delete-btn" title="削除">🗑️</button>
+            </span>`
+                : ''
+            }
           </div>
           <div class="comment-text">${escapeHtml(c.text)}</div>
         </div>
@@ -480,6 +515,12 @@ function handleItemClick(e) {
     if (confirm('削除しますか？')) deleteItem(id);
   } else if (e.target.classList.contains('edit-btn')) {
     startEdit(li, id);
+  } else if (e.target.classList.contains('comment-delete-btn')) {
+    const commentDiv = e.target.closest('.comment');
+    if (confirm('コメントを削除しますか？')) deleteComment(id, commentDiv.dataset.commentId);
+  } else if (e.target.classList.contains('comment-edit-btn')) {
+    const commentDiv = e.target.closest('.comment');
+    startCommentEdit(commentDiv, id, commentDiv.dataset.commentId);
   }
 }
 
@@ -560,6 +601,56 @@ function startEdit(li, id) {
     }
     editingId = null;
     editItem(id, { text, note: noteInput.value.trim(), dueDate: dueInput.value || null });
+  });
+}
+
+function startCommentEdit(commentDiv, itemId, commentId) {
+  const item = items.find((i) => i.id === itemId);
+  const comment = item && (item.comments || []).find((c) => c.id === commentId);
+  if (!comment) return;
+  editingId = itemId;
+
+  const textEl = commentDiv.querySelector('.comment-text');
+
+  const form = document.createElement('div');
+  form.className = 'comment-edit-form';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 300;
+  input.value = comment.text;
+
+  const actions = document.createElement('div');
+  actions.className = 'comment-edit-actions';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'comment-edit-cancel-btn';
+  cancelBtn.textContent = 'キャンセル';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'comment-edit-save-btn';
+  saveBtn.textContent = '保存';
+  actions.append(cancelBtn, saveBtn);
+
+  form.append(input, actions);
+  textEl.replaceWith(form);
+
+  input.focus();
+  input.select();
+
+  cancelBtn.addEventListener('click', () => {
+    editingId = null;
+    renderCurrentView();
+  });
+
+  saveBtn.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+    editingId = null;
+    editComment(itemId, commentId, text);
   });
 }
 
