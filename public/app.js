@@ -12,6 +12,7 @@ const addDetails = document.getElementById('add-details');
 const addNote = document.getElementById('add-note');
 const addDue = document.getElementById('add-due');
 const privateCheckbox = document.getElementById('private-checkbox');
+const privateToggleOtherEl = document.getElementById('private-toggle-other');
 const itemList = document.getElementById('item-list');
 const emptyMsg = document.getElementById('empty-msg');
 const filterBtns = document.querySelectorAll('.filter-btn');
@@ -46,6 +47,10 @@ let calendarMode = false;
 let calendarMonth = new Date();
 calendarMonth.setDate(1);
 let selectedDate = null;
+
+function otherName() {
+  return NAMES.find((n) => n !== myName) || '相手';
+}
 
 function escapeHtml(str) {
   return String(str)
@@ -120,6 +125,7 @@ function showApp() {
   appEl.classList.remove('hidden');
   triggerFadeIn(appEl);
   currentNameEl.textContent = myName;
+  privateToggleOtherEl.textContent = otherName();
   fetchItems();
   if (!pollTimer) {
     pollTimer = setInterval(fetchItems, 4000);
@@ -419,7 +425,7 @@ function itemExpandHtml(item) {
       ? `
       <label class="visibility-toggle">
         <input type="checkbox" class="visibility-checkbox" ${item.visibility === 'private' ? 'checked' : ''}>
-        🔒 自分だけに表示（相手には見えません）
+        🔒 自分だけに表示（${escapeHtml(otherName())}には見えません）
       </label>
     `
       : '';
