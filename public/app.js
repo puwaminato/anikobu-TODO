@@ -476,7 +476,7 @@ function itemExpandHtml(item) {
       ? `
       <label class="visibility-toggle">
         <input type="checkbox" class="visibility-checkbox" ${item.visibility === 'private' ? 'checked' : ''}>
-        🔒 自分だけに表示（${escapeHtml(otherName())}には見えません）
+        🔒 ${escapeHtml(otherName())}には見えません
       </label>
     `
       : '';
@@ -508,22 +508,24 @@ function itemToHtml(item) {
   const abandonActiveClass = item.status === 'abandoned' ? 'active' : '';
   return `
     <li class="item ${closedClass} ${abandonedClass}" data-id="${escapeHtml(item.id)}" data-owner="${escapeHtml(item.addedBy)}">
-      <div class="item-checkbox-wrap">
-        <input type="checkbox" class="item-checkbox" ${item.status === 'done' ? 'checked' : ''}>
+      <div class="item-row">
+        <div class="item-checkbox-wrap">
+          <input type="checkbox" class="item-checkbox" ${item.status === 'done' ? 'checked' : ''}>
+        </div>
+        <div class="item-body">
+          <div class="item-text">${lockIcon}${escapeHtml(item.text)}</div>
+          ${noteHtml}
+          ${dueBadgeHtml(item)}
+          ${commentCountHtml(item)}
+        </div>
+        <div class="item-actions">
+          ${calAddBtnHtml(item)}
+          <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
+          <button class="edit-btn" title="編集">✏️</button>
+          <button class="delete-btn" title="削除">🗑️</button>
+        </div>
       </div>
-      <div class="item-body">
-        <div class="item-text">${lockIcon}${escapeHtml(item.text)}</div>
-        ${noteHtml}
-        ${dueBadgeHtml(item)}
-        ${commentCountHtml(item)}
-        ${itemExpandHtml(item)}
-      </div>
-      <div class="item-actions">
-        ${calAddBtnHtml(item)}
-        <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
-        <button class="edit-btn" title="編集">✏️</button>
-        <button class="delete-btn" title="削除">🗑️</button>
-      </div>
+      ${itemExpandHtml(item)}
     </li>
   `;
 }
