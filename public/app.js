@@ -1,4 +1,5 @@
 const NAMES = ['はる', 'みなと'];
+const APP_VERSION = '1.0.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -40,6 +41,8 @@ const calDayTitle = document.getElementById('cal-day-title');
 const calDayItems = document.getElementById('cal-day-items');
 const calDayAddForm = document.getElementById('cal-day-add-form');
 const calDayAddInput = document.getElementById('cal-day-add-input');
+const appFooterEl = document.getElementById('app-footer');
+appFooterEl.textContent = `Ver.${APP_VERSION}`;
 
 let myName = localStorage.getItem('yaritai_name') || '';
 if (!NAMES.includes(myName)) myName = '';
