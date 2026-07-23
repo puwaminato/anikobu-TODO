@@ -675,6 +675,74 @@ header h1 {
   cursor: pointer;
 }
 
+.comment-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comment-add-row .comment-form {
+  flex: 1;
+}
+
+.stamp-toggle-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stamp-toggle-btn:active {
+  background: var(--bg);
+}
+
+.stamp-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stamp-btn {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 10px;
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stamp-btn:active {
+  background: var(--bg);
+}
+
+.stamp-btn img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.comment-stamp {
+  margin-top: 4px;
+}
+
+.stamp-img {
+  max-width: 72px;
+  max-height: 72px;
+  object-fit: contain;
+}
+
 .item-note {
   font-size: 13px;
   color: var(--muted);
