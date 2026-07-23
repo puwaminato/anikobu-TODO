@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -479,7 +479,7 @@ function itemExpandHtml(item) {
       ? `
       <label class="visibility-toggle">
         <input type="checkbox" class="visibility-checkbox" ${item.visibility === 'private' ? 'checked' : ''}>
-        🔒 ${escapeHtml(otherName())}には見えません
+        🔒 ${escapeHtml(otherName())}に見せない
       </label>
     `
       : '';
