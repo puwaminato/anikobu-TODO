@@ -44,10 +44,21 @@ async function initDb() {
       item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
       author TEXT NOT NULL,
       text TEXT NOT NULL,
-      created_at BIGINT NOT NULL
+      created_at BIGINT NOT NULL,
+      stamp TEXT
     )
   `);
+  // 既存テーブルに stamp 列がなければ追加する（マイグレーション）
+  await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS stamp TEXT`);
 }
+
+// スタンプの種類（id → 表示用ラベル）。追加時のバリデーションにも使う
+const STAMPS = {
+  ok: 'OK',
+  arigatou: 'ありがとう',
+  guts: 'やったね',
+  heart: 'だいすき',
+};
 
 function rowToItem(row) {
   return {
@@ -69,6 +80,7 @@ function rowToComment(row) {
     id: row.id,
     author: row.author,
     text: row.text,
+    stamp: row.stamp || null,
     createdAt: Number(row.created_at),
   };
 }
@@ -134,12 +146,12 @@ async function insertItem(item) {
   saveItemsToFile(items);
 }
 
-async function addCommentToItem(itemId, author, text) {
-  const comment = { id: crypto.randomUUID(), author, text, createdAt: Date.now() };
+async function addCommentToItem(itemId, author, text, stamp = null) {
+  const comment = { id: crypto.randomUUID(), author, text, stamp, createdAt: Date.now() };
   if (pool) {
     await pool.query(
-      `INSERT INTO comments (id, item_id, author, text, created_at) VALUES ($1,$2,$3,$4,$5)`,
-      [comment.id, itemId, comment.author, comment.text, comment.createdAt]
+      `INSERT INTO comments (id, item_id, author, text, stamp, created_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [comment.id, itemId, comment.author, comment.text, comment.stamp, comment.createdAt]
     );
     return comment;
   }
@@ -396,18 +408,27 @@ app.get('/api/items/:id/ics', async (req, res) => {
   res.send(buildIcs(item));
 });
 
-// コメント（返信）を追加
+// コメント（返信）を追加。stamp が指定された場合はスタンプコメントとして扱う
 app.post('/api/items/:id/comments', async (req, res) => {
   const { id } = req.params;
-  const { text, name } = req.body;
-  if (!text || !text.trim()) {
+  const { text, name, stamp } = req.body;
+
+  let commentText = (text || '').trim();
+  let stampId = null;
+  if (stamp) {
+    if (!STAMPS[stamp]) return res.status(400).json({ error: 'invalid stamp' });
+    stampId = stamp;
+    commentText = STAMPS[stamp];
+  }
+  if (!commentText) {
     return res.status(400).json({ error: 'text is required' });
   }
+
   if (pool) {
     const { rows } = await pool.query('SELECT id FROM items WHERE id=$1', [id]);
     if (!rows.length) return res.status(404).json({ error: 'not found' });
   }
-  const comment = await addCommentToItem(id, (name || '').trim() || '匿名', text.trim());
+  const comment = await addCommentToItem(id, (name || '').trim() || '匿名', commentText, stampId);
   if (!comment) return res.status(404).json({ error: 'not found' });
   res.status(201).json(comment);
 });
