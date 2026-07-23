@@ -1030,3 +1030,11 @@ header h1 {
   text-align: center;
   padding: 12px 0;
 }
+
+.app-footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 24px;
+  padding-bottom: 8px;
+}
