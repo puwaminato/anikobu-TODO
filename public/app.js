@@ -1,5 +1,13 @@
 const NAMES = ['はる', 'みなと'];
 
+const STAMPS = [
+  { id: 'ok', file: 'ok.png', label: 'OK' },
+  { id: 'arigatou', file: 'arigatou.png', label: 'ありがとう' },
+  { id: 'guts', file: 'guts.png', label: 'やったね' },
+  { id: 'heart', file: 'heart.png', label: 'だいすき' },
+];
+const STAMP_FILE = Object.fromEntries(STAMPS.map((s) => [s.id, s.file]));
+
 const nameGate = document.getElementById('name-gate');
 const nameChoiceBtns = document.querySelectorAll('.name-choice-btn');
 const appEl = document.getElementById('app');
@@ -41,6 +49,7 @@ let currentPerson = 'all';
 let pollTimer = null;
 let editingId = null;
 let expandedIds = new Set();
+let openStampFor = new Set();
 let searchQuery = '';
 let commentInputFocused = false;
 let calendarMode = false;
@@ -276,6 +285,21 @@ async function addComment(itemId, text) {
   renderCurrentView();
 }
 
+async function addStamp(itemId, stampId) {
+  const res = await fetch(`/api/items/${itemId}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: myName, stamp: stampId }),
+  });
+  const comment = await res.json();
+  const item = items.find((i) => i.id === itemId);
+  if (item) {
+    if (!item.comments) item.comments = [];
+    item.comments.push(comment);
+  }
+  renderCurrentView();
+}
+
 async function editComment(itemId, commentId, text) {
   const res = await fetch(`/api/items/${itemId}/comments/${commentId}`, {
     method: 'PUT',
@@ -374,6 +398,16 @@ function dueBadgeHtml(item) {
   return `<span class="due-badge ${cls}">📅 ${label} ${formatDueDate(item.dueDate)}</span>`;
 }
 
+function commentBodyHtml(c) {
+  if (c.stamp) {
+    const file = STAMP_FILE[c.stamp];
+    return file
+      ? `<div class="comment-text comment-stamp"><img src="/${file}" alt="${escapeHtml(c.text)}" class="stamp-img"></div>`
+      : `<div class="comment-text">${escapeHtml(c.text)}</div>`;
+  }
+  return `<div class="comment-text">${escapeHtml(c.text)}</div>`;
+}
+
 function commentsHtml(item) {
   const comments = item.comments || [];
   const list = comments
@@ -389,24 +423,41 @@ function commentsHtml(item) {
               c.author === myName
                 ? `
             <span class="comment-actions">
-              <button type="button" class="comment-edit-btn" title="編集">✏️</button>
+              ${c.stamp ? '' : '<button type="button" class="comment-edit-btn" title="編集">✏️</button>'}
               <button type="button" class="comment-delete-btn" title="削除">🗑️</button>
             </span>`
                 : ''
             }
           </div>
-          <div class="comment-text">${escapeHtml(c.text)}</div>
+          ${commentBodyHtml(c)}
         </div>
       `
     )
     .join('');
+  const stampPaletteHtml = openStampFor.has(item.id)
+    ? `
+    <div class="stamp-palette">
+      ${STAMPS.map(
+        (s) => `
+        <button type="button" class="stamp-btn" data-stamp="${s.id}" title="${escapeHtml(s.label)}">
+          <img src="/${s.file}" alt="${escapeHtml(s.label)}">
+        </button>
+      `
+      ).join('')}
+    </div>
+  `
+    : '';
   return `
     <div class="comment-thread">
       ${list || '<div class="comment-empty">まだコメントはありません</div>'}
-      <form class="comment-form" data-item-id="${escapeHtml(item.id)}">
-        <input type="text" class="comment-input" placeholder="返信を入力…" maxlength="300" autocomplete="off">
-        <button type="submit">送信</button>
-      </form>
+      <div class="comment-add-row">
+        <form class="comment-form" data-item-id="${escapeHtml(item.id)}">
+          <input type="text" class="comment-input" placeholder="返信を入力…" maxlength="300" autocomplete="off">
+          <button type="submit">送信</button>
+        </form>
+        <button type="button" class="stamp-toggle-btn" title="スタンプ">😊</button>
+      </div>
+      ${stampPaletteHtml}
     </div>
   `;
 }
@@ -502,6 +553,13 @@ function handleItemClick(e) {
   if (!li) return;
   const id = li.dataset.id;
 
+  const stampBtn = e.target.closest('.stamp-btn');
+  if (stampBtn) {
+    openStampFor.delete(id);
+    addStamp(id, stampBtn.dataset.stamp);
+    return;
+  }
+
   if (e.target.classList.contains('item-checkbox')) {
     if (e.target.checked) {
       const rect = e.target.getBoundingClientRect();
@@ -527,6 +585,10 @@ function handleItemClick(e) {
   } else if (e.target.classList.contains('comment-edit-btn')) {
     const commentDiv = e.target.closest('.comment');
     startCommentEdit(commentDiv, id, commentDiv.dataset.commentId);
+  } else if (e.target.classList.contains('stamp-toggle-btn')) {
+    if (openStampFor.has(id)) openStampFor.delete(id);
+    else openStampFor.add(id);
+    renderCurrentView();
   }
 }
 
