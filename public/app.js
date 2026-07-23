@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -51,7 +51,7 @@ let currentFilter = 'active';
 let currentPerson = 'all';
 let pollTimer = null;
 let editingId = null;
-let expandedIds = new Set();
+let expandedId = null;
 let openStampFor = new Set();
 let searchQuery = '';
 let commentInputFocused = false;
@@ -466,7 +466,7 @@ function commentsHtml(item) {
 }
 
 function itemExpandHtml(item) {
-  if (!expandedIds.has(item.id)) return '';
+  if (item.id !== expandedId) return '';
   const addedLine = `追加: ${escapeHtml(item.addedBy)} (${formatDate(item.createdAt)})`;
   let closedLine = '';
   if (item.status === 'done') {
@@ -572,8 +572,7 @@ function handleItemClick(e) {
     }
     setStatus(id, e.target.checked ? 'done' : 'active');
   } else if (e.target.classList.contains('item-text')) {
-    if (expandedIds.has(id)) expandedIds.delete(id);
-    else expandedIds.add(id);
+    expandedId = expandedId === id ? null : id;
     renderCurrentView();
   } else if (e.target.classList.contains('visibility-checkbox')) {
     setVisibility(id, e.target.checked ? 'private' : 'shared');
