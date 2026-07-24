@@ -1351,6 +1351,13 @@ header h1 {
   margin-top: 2px;
 }
 
+.trash-item-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .trash-restore-btn {
   flex-shrink: 0;
   border: none;
@@ -1361,4 +1368,23 @@ header h1 {
   padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.trash-purge-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--danger-bg);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 15px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trash-purge-btn:active {
+  filter: brightness(0.95);
 }
