@@ -92,7 +92,7 @@ function otherName() {
   return NAMES.find((n) => n !== myName) || '相手';
 }
 
-// 記念日(2025年12月28日)を1日目とした経過日数を表示する
+// 記念日（2025年12月28日）を1日目とした経過日数を表示する
 function renderFooter() {
   const today = new Date();
   const a = new Date(ANNIVERSARY_DATE.getFullYear(), ANNIVERSARY_DATE.getMonth(), ANNIVERSARY_DATE.getDate());
@@ -102,7 +102,7 @@ function renderFooter() {
   versionLineEl.textContent = `Ver.${APP_VERSION}`;
 }
 
-// 標準表示(未達成・ふたり・検索なし・他ビューを開いていない)のときだけ手動並び替えを許可する
+// 標準表示（未達成・ふたり・検索なし・他ビューを開いていない）のときだけ手動並び替えを許可する
 function dragEnabled() {
   return (
     !calendarMode &&
@@ -123,7 +123,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-// タップ位置に波紋を出す(録画時などにタップ箇所が分かるように)
+// タップ位置に波紋を出す（録画時などにタップ箇所が分かるように）
 function spawnRipple(x, y, size) {
   const ripple = document.createElement('span');
   ripple.className = 'tap-ripple';
@@ -232,14 +232,14 @@ function renderCurrentView() {
   }
 }
 
-// タブバーの選択状態を見た目に反映する(該当なし＝カレンダー表示中は null)
+// タブバーの選択状態を見た目に反映する（該当なし＝カレンダー表示中は null）
 function updateViewTabs(activeView) {
   viewTabBtns.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === activeView);
   });
 }
 
-// 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする(切り替え前の下準備)
+// 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする（切り替え前の下準備）
 function closeAllViews() {
   calendarMode = false;
   ideasMode = false;
@@ -883,9 +883,18 @@ function trashItemToHtml(item) {
         <div class="trash-item-text">${escapeHtml(item.text)}</div>
         <div class="trash-item-meta">${escapeHtml(item.addedBy)}さんの${kindLabel} ・ 残り${remainingDays}日で完全に削除されます</div>
       </div>
-      <button type="button" class="trash-restore-btn">元に戻す</button>
+      <div class="trash-item-actions">
+        <button type="button" class="trash-restore-btn">元に戻す</button>
+        <button type="button" class="trash-purge-btn" title="完全に削除">🗑️</button>
+      </div>
     </li>
   `;
+}
+
+async function purgeTrashItem(type, id) {
+  await fetch(`/api/trash/${type}/${id}`, { method: 'DELETE' });
+  trash = trash.filter((i) => i.id !== id);
+  renderTrash();
 }
 
 function renderTrash() {
@@ -896,9 +905,13 @@ function renderTrash() {
 trashList.addEventListener('click', (e) => {
   const li = e.target.closest('.trash-item');
   if (!li) return;
+  const id = li.dataset.id;
+  const type = li.dataset.type;
   if (e.target.classList.contains('trash-restore-btn')) {
-    if (li.dataset.type === 'idea') restoreIdea(li.dataset.id);
-    else restoreItem(li.dataset.id);
+    if (type === 'idea') restoreIdea(id);
+    else restoreItem(id);
+  } else if (e.target.classList.contains('trash-purge-btn')) {
+    if (confirm('完全に削除します。元に戻せなくなりますが、よろしいですか？')) purgeTrashItem(type, id);
   }
 });
 
