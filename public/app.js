@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -55,6 +55,7 @@ let expandedId = null;
 let openStampFor = new Set();
 let searchQuery = '';
 let commentInputFocused = false;
+let dragInProgress = false;
 let calendarMode = false;
 let calendarMonth = new Date();
 calendarMonth.setDate(1);
@@ -62,6 +63,11 @@ let selectedDate = null;
 
 function otherName() {
   return NAMES.find((n) => n !== myName) || '相手';
+}
+
+// 標準表示（未達成・ふたり・検索なし）のときだけ手動並び替えを許可する
+function dragEnabled() {
+  return !calendarMode && currentFilter === 'active' && currentPerson === 'all' && !searchQuery;
 }
 
 function escapeHtml(str) {
@@ -212,7 +218,7 @@ async function fetchItems() {
   try {
     const res = await fetch('/api/items?viewer=' + encodeURIComponent(myName));
     items = await res.json();
-    if (!commentInputFocused) {
+    if (!commentInputFocused && !dragInProgress) {
       renderCurrentView();
     }
   } catch (e) {
@@ -509,9 +515,12 @@ function itemToHtml(item) {
   const closedClass = item.status !== 'active' ? 'closed' : '';
   const abandonedClass = item.status === 'abandoned' ? 'abandoned' : '';
   const abandonActiveClass = item.status === 'abandoned' ? 'active' : '';
+  const dragHandleHtml =
+    dragEnabled() && item.status === 'active' ? '<span class="drag-handle" title="並び替え">≡</span>' : '';
   return `
     <li class="item ${closedClass} ${abandonedClass}" data-id="${escapeHtml(item.id)}" data-owner="${escapeHtml(item.addedBy)}">
       <div class="item-row">
+        ${dragHandleHtml}
         <div class="item-checkbox-wrap">
           <input type="checkbox" class="item-checkbox" ${item.status === 'done' ? 'checked' : ''}>
         </div>
@@ -598,6 +607,75 @@ function handleItemClick(e) {
 
 itemList.addEventListener('click', handleItemClick);
 calDayItems.addEventListener('click', handleItemClick);
+
+// ---- 手動並び替え（ドラッグ&ドロップ） ----
+function getDragAfterElement(y) {
+  const els = [...itemList.querySelectorAll('.item:not(.dragging)')];
+  return els.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null }
+  ).element;
+}
+
+async function commitOrder() {
+  const ids = Array.from(itemList.querySelectorAll('.item')).map((li) => li.dataset.id);
+  try {
+    await fetch('/api/items/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+  } catch (e) {
+    console.error('並び替えの保存に失敗', e);
+  }
+  await fetchItems();
+}
+
+function startDrag(li, downEvent) {
+  const handle = downEvent.target.closest('.drag-handle');
+  if (!handle) return;
+  downEvent.preventDefault();
+  handle.setPointerCapture(downEvent.pointerId);
+  dragInProgress = true;
+  li.classList.add('dragging');
+
+  function onMove(e) {
+    const after = getDragAfterElement(e.clientY);
+    if (after == null) {
+      if (itemList.lastElementChild !== li) itemList.appendChild(li);
+    } else if (after !== li) {
+      itemList.insertBefore(li, after);
+    }
+  }
+
+  function onUp() {
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('pointercancel', onUp);
+    li.classList.remove('dragging');
+    dragInProgress = false;
+    commitOrder();
+  }
+
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onUp);
+  handle.addEventListener('pointercancel', onUp);
+}
+
+itemList.addEventListener('pointerdown', (e) => {
+  const handle = e.target.closest('.drag-handle');
+  if (!handle) return;
+  const li = handle.closest('.item');
+  if (!li) return;
+  startDrag(li, e);
+});
 
 function handleCommentSubmit(e) {
   const form = e.target.closest('.comment-form');
