@@ -609,8 +609,10 @@ itemList.addEventListener('click', handleItemClick);
 calDayItems.addEventListener('click', handleItemClick);
 
 // ---- 手動並び替え（ドラッグ&ドロップ） ----
+// つまんだカードは指に追従してなめらかに浮かせ、他のカードは枠線だけの
+// プレースホルダーの位置で並び替え先を示す（カード自体を瞬間移動させない）
 function getDragAfterElement(y) {
-  const els = [...itemList.querySelectorAll('.item:not(.dragging)')];
+  const els = [...itemList.querySelectorAll('.item:not(.dragging):not(.drag-placeholder)')];
   return els.reduce(
     (closest, child) => {
       const box = child.getBoundingClientRect();
@@ -644,22 +646,51 @@ function startDrag(li, downEvent) {
   downEvent.preventDefault();
   handle.setPointerCapture(downEvent.pointerId);
   dragInProgress = true;
+
+  const listRect = itemList.getBoundingClientRect();
+  const itemRect = li.getBoundingClientRect();
+  const grabOffsetY = downEvent.clientY - itemRect.top;
+
+  const placeholder = document.createElement('li');
+  placeholder.className = 'item drag-placeholder';
+  placeholder.style.height = itemRect.height + 'px';
+  li.after(placeholder);
+
   li.classList.add('dragging');
+  li.style.width = itemRect.width + 'px';
+  li.style.left = itemRect.left - listRect.left + 'px';
+  li.style.top = itemRect.top - listRect.top + 'px';
+
+  let rafId = null;
+  let pendingClientY = downEvent.clientY;
+
+  function applyPosition() {
+    rafId = null;
+    li.style.top = pendingClientY - grabOffsetY - listRect.top + 'px';
+    const after = getDragAfterElement(pendingClientY);
+    if (after == null) {
+      if (itemList.lastElementChild !== placeholder) itemList.appendChild(placeholder);
+    } else if (after !== placeholder) {
+      itemList.insertBefore(placeholder, after);
+    }
+  }
 
   function onMove(e) {
-    const after = getDragAfterElement(e.clientY);
-    if (after == null) {
-      if (itemList.lastElementChild !== li) itemList.appendChild(li);
-    } else if (after !== li) {
-      itemList.insertBefore(li, after);
-    }
+    pendingClientY = e.clientY;
+    if (rafId == null) rafId = requestAnimationFrame(applyPosition);
   }
 
   function onUp() {
     handle.removeEventListener('pointermove', onMove);
     handle.removeEventListener('pointerup', onUp);
     handle.removeEventListener('pointercancel', onUp);
+    if (rafId != null) cancelAnimationFrame(rafId);
+    itemList.replaceChild(li, placeholder);
     li.classList.remove('dragging');
+    li.style.position = '';
+    li.style.top = '';
+    li.style.left = '';
+    li.style.width = '';
     dragInProgress = false;
     commitOrder();
   }
