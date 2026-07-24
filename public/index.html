@@ -32,9 +32,7 @@
         <div class="user-badge">
           <span id="current-name"></span>さん
           <button id="change-name" title="名前を変更">変更</button>
-          <button id="ideas-toggle" title="思いつきメモ">💡</button>
           <button id="calendar-toggle" title="カレンダー">📅</button>
-          <button id="trash-toggle" title="ゴミ箱">🗑️</button>
         </div>
       </header>
 
@@ -84,6 +82,12 @@
         <div class="search-box">
           <input type="search" id="search-input" placeholder="🔍 キーワードで検索…" autocomplete="off">
         </div>
+      </div>
+
+      <div id="view-tabs" class="view-tabs">
+        <button type="button" class="view-tab-btn active" data-view="list" title="やりたいことリスト">📝</button>
+        <button type="button" class="view-tab-btn" data-view="ideas" title="思いつきメモ">💡</button>
+        <button type="button" class="view-tab-btn" data-view="trash" title="ゴミ箱">🗑️</button>
       </div>
     </div>
   </div>
@@ -137,7 +141,10 @@
     <p id="trash-empty-msg" class="hidden">ゴミ箱は空です。</p>
   </div>
 
-  <footer id="app-footer" class="app-footer"></footer>
+  <footer id="app-footer" class="app-footer">
+    <div id="anniversary-counter" class="anniversary-counter"></div>
+    <div id="version-line"></div>
+  </footer>
 </div>
 
 <script src="app.js"></script>
