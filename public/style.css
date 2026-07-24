@@ -315,6 +315,30 @@ header h1 {
   flex: 1;
 }
 
+.repeat-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.repeat-label select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  flex: 1;
+  background: white;
+  color: var(--text);
+}
+
+.repeat-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
 .private-toggle {
   display: flex;
   align-items: center;
@@ -808,6 +832,18 @@ header h1 {
   border-color: var(--warning-bg);
 }
 
+.repeat-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--secondary-dark);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
 .due-badge.overdue {
   color: var(--danger);
   background: var(--danger-bg);
@@ -886,8 +922,15 @@ header h1 {
   color: var(--muted);
 }
 
-.edit-form-row input[type="date"] {
+.edit-form-row input[type="date"],
+.edit-form-row select {
   flex: 1;
+  font-size: 15px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
 }
 
 .edit-form-actions {
