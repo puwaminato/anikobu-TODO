@@ -1,5 +1,6 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
+const ANNIVERSARY_DATE = new Date(2025, 11, 28); // 2025年12月28日を1日目とする
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -45,9 +46,8 @@ const calDayItems = document.getElementById('cal-day-items');
 const calDayAddForm = document.getElementById('cal-day-add-form');
 const calDayAddInput = document.getElementById('cal-day-add-input');
 const appFooterEl = document.getElementById('app-footer');
-appFooterEl.textContent = `Ver.${APP_VERSION}`;
 
-const ideasToggleBtn = document.getElementById('ideas-toggle');
+const viewTabBtns = document.querySelectorAll('.view-tab-btn');
 const ideasView = document.getElementById('ideas-view');
 const ideasCloseBtn = document.getElementById('ideas-close');
 const ideaAddForm = document.getElementById('idea-add-form');
@@ -57,11 +57,13 @@ const ideaPick = document.getElementById('idea-pick');
 const ideaList = document.getElementById('idea-list');
 const ideaEmptyMsg = document.getElementById('idea-empty-msg');
 
-const trashToggleBtn = document.getElementById('trash-toggle');
 const trashView = document.getElementById('trash-view');
 const trashCloseBtn = document.getElementById('trash-close');
 const trashList = document.getElementById('trash-list');
 const trashEmptyMsg = document.getElementById('trash-empty-msg');
+
+const anniversaryCounterEl = document.getElementById('anniversary-counter');
+const versionLineEl = document.getElementById('version-line');
 
 let myName = localStorage.getItem('yaritai_name') || '';
 if (!NAMES.includes(myName)) myName = '';
@@ -87,6 +89,16 @@ let pickedIdeaId = null;
 
 function otherName() {
   return NAMES.find((n) => n !== myName) || '相手';
+}
+
+// 記念日（2025年12月28日）を1日目とした経過日数を表示する
+function renderFooter() {
+  const today = new Date();
+  const a = new Date(ANNIVERSARY_DATE.getFullYear(), ANNIVERSARY_DATE.getMonth(), ANNIVERSARY_DATE.getDate());
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dayCount = Math.round((t - a) / (24 * 60 * 60 * 1000)) + 1;
+  anniversaryCounterEl.textContent = dayCount >= 1 ? `付き合い始めて${dayCount}日` : '';
+  versionLineEl.textContent = `Ver.${APP_VERSION}`;
 }
 
 // 標準表示（未達成・ふたり・検索なし・他ビューを開いていない）のときだけ手動並び替えを許可する
@@ -219,6 +231,13 @@ function renderCurrentView() {
   }
 }
 
+// タブバーの選択状態を見た目に反映する（該当なし＝カレンダー表示中は null）
+function updateViewTabs(activeView) {
+  viewTabBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.view === activeView);
+  });
+}
+
 // 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする（切り替え前の下準備）
 function closeAllViews() {
   calendarMode = false;
@@ -236,6 +255,7 @@ function showListView() {
   listControls.classList.remove('hidden');
   itemList.classList.remove('hidden');
   triggerFadeIn(itemList);
+  updateViewTabs('list');
   render();
 }
 
@@ -249,6 +269,7 @@ function openCalendar() {
   calendarToggleBtn.textContent = '📋';
   calendarToggleBtn.title = '一覧に戻る';
   triggerFadeIn(calendarView);
+  updateViewTabs(null);
   renderCalendar();
   renderDayPanel();
 }
@@ -275,20 +296,13 @@ function openIdeas() {
   emptyMsg.classList.add('hidden');
   ideasView.classList.remove('hidden');
   triggerFadeIn(ideasView);
+  updateViewTabs('ideas');
   fetchIdeas();
 }
 
 function closeIdeas() {
   showListView();
 }
-
-ideasToggleBtn.addEventListener('click', () => {
-  if (ideasMode) {
-    closeIdeas();
-  } else {
-    openIdeas();
-  }
-});
 
 ideasCloseBtn.addEventListener('click', closeIdeas);
 
@@ -300,6 +314,7 @@ function openTrash() {
   emptyMsg.classList.add('hidden');
   trashView.classList.remove('hidden');
   triggerFadeIn(trashView);
+  updateViewTabs('trash');
   fetchTrash();
 }
 
@@ -307,15 +322,16 @@ function closeTrash() {
   showListView();
 }
 
-trashToggleBtn.addEventListener('click', () => {
-  if (trashMode) {
-    closeTrash();
-  } else {
-    openTrash();
-  }
-});
-
 trashCloseBtn.addEventListener('click', closeTrash);
+
+viewTabBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    if (view === 'list') showListView();
+    else if (view === 'ideas') openIdeas();
+    else if (view === 'trash') openTrash();
+  });
+});
 
 async function fetchItems() {
   try {
@@ -402,6 +418,13 @@ async function deleteItem(id) {
 
 async function restoreItem(id) {
   await fetch(`/api/items/${id}/restore`, { method: 'POST' });
+  trash = trash.filter((i) => i.id !== id);
+  renderTrash();
+  fetchItems();
+}
+
+async function restoreIdea(id) {
+  await fetch(`/api/ideas/${id}/restore`, { method: 'POST' });
   trash = trash.filter((i) => i.id !== id);
   renderTrash();
 }
@@ -784,7 +807,7 @@ function ideaToHtml(idea) {
         <div class="idea-item-meta">${escapeHtml(idea.addedBy)} ・ ${formatDate(idea.createdAt)}</div>
       </div>
       <div class="idea-item-actions">
-        <button type="button" class="idea-move-btn" title="やりたいことリストへ">➡️</button>
+        <button type="button" class="idea-move-btn" title="やりたいことリストへ">📝</button>
         <button type="button" class="idea-delete-btn" title="削除">🗑️</button>
       </div>
     </li>
@@ -832,15 +855,16 @@ ideaList.addEventListener('click', (e) => {
   }
 });
 
-// ---- ゴミ箱 ----
+// ---- ゴミ箱（やりたいことリスト・思いつきメモ両方を表示） ----
 function trashItemToHtml(item) {
   const remainingMs = item.deletedAt + 7 * 24 * 60 * 60 * 1000 - Date.now();
   const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  const kindLabel = item.type === 'idea' ? '思いつきメモ' : 'やりたいことリスト';
   return `
-    <li class="trash-item" data-id="${escapeHtml(item.id)}">
+    <li class="trash-item" data-id="${escapeHtml(item.id)}" data-type="${item.type}">
       <div class="trash-item-body">
         <div class="trash-item-text">${escapeHtml(item.text)}</div>
-        <div class="trash-item-meta">${escapeHtml(item.addedBy)}さんのタスク ・ 残り${remainingDays}日で完全に削除されます</div>
+        <div class="trash-item-meta">${escapeHtml(item.addedBy)}さんの${kindLabel} ・ 残り${remainingDays}日で完全に削除されます</div>
       </div>
       <button type="button" class="trash-restore-btn">元に戻す</button>
     </li>
@@ -856,13 +880,12 @@ trashList.addEventListener('click', (e) => {
   const li = e.target.closest('.trash-item');
   if (!li) return;
   if (e.target.classList.contains('trash-restore-btn')) {
-    restoreItem(li.dataset.id);
+    if (li.dataset.type === 'idea') restoreIdea(li.dataset.id);
+    else restoreItem(li.dataset.id);
   }
 });
 
 // ---- 手動並び替え（ドラッグ&ドロップ） ----
-// つまんだカードは指に追従してなめらかに浮かせ、他のカードは枠線だけの
-// プレースホルダーの位置で並び替え先を示す（カード自体を瞬間移動させない）
 function getDragAfterElement(y) {
   const els = [...itemList.querySelectorAll('.item:not(.dragging):not(.drag-placeholder)')];
   return els.reduce(
@@ -1139,8 +1162,10 @@ function renderCalendar() {
     const classes = ['cal-cell'];
     if (dateStr === today) classes.push('today');
     if (dateStr === selectedDate) classes.push('selected');
+    if (d === 28) classes.push('anniversary');
+    const dayLabel = d === 28 ? '🩷' : d;
     const dot = datesWithItems.has(dateStr) ? '<span class="cal-dot"></span>' : '';
-    html += `<div class="${classes.join(' ')}" data-date="${dateStr}">${d}${dot}</div>`;
+    html += `<div class="${classes.join(' ')}" data-date="${dateStr}">${dayLabel}${dot}</div>`;
   }
 
   calendarGrid.innerHTML = html;
@@ -1197,6 +1222,7 @@ calDayAddForm.addEventListener('submit', async (e) => {
 });
 
 // 初期化
+renderFooter();
 if (myName) {
   showApp();
 } else {
