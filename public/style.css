@@ -857,11 +857,11 @@ header h1 {
   flex-shrink: 0;
 }
 
-/* カレンダーの有無に関わらず、各ボタンの位置を固定する
-   （左上=カレンダー、右上=頓挫、左下=編集、右下=削除） */
-.cal-add-btn { grid-column: 1; grid-row: 1; }
+/* カレンダー・削除ボタンの有無に関わらず、各ボタンの位置を固定する
+   （左上=編集、右上=頓挫、左下=カレンダー、右下=削除） */
+.edit-btn { grid-column: 1; grid-row: 1; }
 .abandon-btn { grid-column: 2; grid-row: 1; }
-.edit-btn { grid-column: 1; grid-row: 2; }
+.cal-add-btn { grid-column: 1; grid-row: 2; }
 .delete-btn { grid-column: 2; grid-row: 2; }
 
 .item-actions button,
