@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -540,10 +540,10 @@ function itemToHtml(item) {
           ${commentCountHtml(item)}
         </div>
         <div class="item-actions">
-          ${calAddBtnHtml(item)}
-          <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
           <button class="edit-btn" title="編集">✏️</button>
-          <button class="delete-btn" title="削除">🗑️</button>
+          <button class="abandon-btn ${abandonActiveClass}" title="頓挫にする">🫧</button>
+          ${calAddBtnHtml(item)}
+          ${item.addedBy === myName ? '<button class="delete-btn" title="削除">🗑️</button>' : ''}
         </div>
       </div>
       ${itemExpandHtml(item)}
