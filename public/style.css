@@ -411,6 +411,7 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
 }
 
 .item {
@@ -462,7 +463,16 @@ header h1 {
 }
 
 .item.dragging {
-  opacity: 0.5;
+  position: absolute;
+  z-index: 50;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+.drag-placeholder {
+  background: transparent;
+  border: 2px dashed var(--border);
+  box-shadow: none;
 }
 
 .item-checkbox-wrap {
