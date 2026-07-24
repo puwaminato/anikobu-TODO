@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.1.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
