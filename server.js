@@ -35,7 +35,8 @@ async function initDb() {
       closed_at BIGINT,
       visibility TEXT NOT NULL DEFAULT 'shared',
       note TEXT DEFAULT '',
-      due_date TEXT
+      due_date TEXT,
+      sort_order DOUBLE PRECISION
     )
   `);
   await pool.query(`
@@ -48,8 +49,9 @@ async function initDb() {
       stamp TEXT
     )
   `);
-  // 既存テーブルに stamp 列がなければ追加する（マイグレーション）
+  // 既存テーブルに stamp / sort_order 列がなければ追加する（マイグレーション）
   await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS stamp TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS sort_order DOUBLE PRECISION`);
 }
 
 // スタンプの種類（id → 表示用ラベル）。追加時のバリデーションにも使う
@@ -72,6 +74,7 @@ function rowToItem(row) {
     visibility: row.visibility,
     note: row.note || '',
     dueDate: row.due_date,
+    sortOrder: row.sort_order !== null && row.sort_order !== undefined ? Number(row.sort_order) : null,
   };
 }
 
@@ -252,6 +255,22 @@ async function updateItemVisibility(id, visibility) {
   return item;
 }
 
+// 手動並び替え。渡された順番どおりに sort_order = 0,1,2... を振り直す
+async function reorderItems(ids) {
+  if (pool) {
+    for (let i = 0; i < ids.length; i++) {
+      await pool.query('UPDATE items SET sort_order=$2 WHERE id=$1', [ids[i], i]);
+    }
+    return;
+  }
+  const items = loadItemsFromFile();
+  ids.forEach((id, i) => {
+    const item = items.find((it) => it.id === id);
+    if (item) item.sortOrder = i;
+  });
+  saveItemsToFile(items);
+}
+
 async function removeItem(id) {
   if (pool) {
     const { rowCount } = await pool.query('DELETE FROM items WHERE id=$1', [id]);
@@ -303,12 +322,17 @@ function buildIcs(item) {
   return lines.join('\r\n') + '\r\n';
 }
 
-// 未達成は期限が近い順、達成済み・頓挫は対応した日が新しい順
+// 未達成は「手動で並び替えた順（あれば）」＞「期限が近い順」、達成済み・頓挫は対応した日が新しい順
 function compareItems(a, b) {
   const aActive = a.status === 'active';
   const bActive = b.status === 'active';
   if (aActive !== bActive) return aActive ? -1 : 1;
   if (aActive) {
+    const aOrder = a.sortOrder;
+    const bOrder = b.sortOrder;
+    if (aOrder != null && bOrder != null) return aOrder - bOrder;
+    if (aOrder != null) return -1;
+    if (bOrder != null) return 1;
     if (a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
     if (a.dueDate) return -1;
     if (b.dueDate) return 1;
@@ -324,6 +348,16 @@ app.get('/api/items', async (req, res) => {
     .filter((i) => i.visibility !== 'private' || i.addedBy === viewer)
     .sort(compareItems);
   res.json(items);
+});
+
+// 手動並び替え（未達成タスクのドラッグ&ドロップ）。渡された id の順番どおりに並び順を保存する
+app.post('/api/items/reorder', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) {
+    return res.status(400).json({ error: 'ids is required' });
+  }
+  await reorderItems(ids);
+  res.status(204).end();
 });
 
 // 追加
@@ -343,6 +377,7 @@ app.post('/api/items', async (req, res) => {
     visibility: visibility === 'private' ? 'private' : 'shared',
     note: (note || '').trim(),
     dueDate: dueDate || null,
+    sortOrder: null,
     comments: [],
   };
   await insertItem(newItem);
