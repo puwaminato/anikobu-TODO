@@ -1265,6 +1265,22 @@ header h1 {
   box-shadow: 0 0 0 3px var(--secondary);
 }
 
+.idea-item-checkbox-wrap {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.idea-item-checkbox {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  accent-color: var(--secondary);
+}
+
 .idea-item-body {
   flex: 1;
   min-width: 0;
