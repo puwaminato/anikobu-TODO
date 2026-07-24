@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -598,7 +598,7 @@ function handleItemClick(e) {
     const item = items.find((i) => i.id === id);
     setStatus(id, item && item.status === 'abandoned' ? 'active' : 'abandoned');
   } else if (e.target.classList.contains('delete-btn')) {
-    if (confirm('削除しますか？')) deleteItem(id);
+    if (confirm('本当に削除しますか？')) deleteItem(id);
   } else if (e.target.classList.contains('edit-btn')) {
     startEdit(li, id);
   } else if (e.target.classList.contains('comment-delete-btn')) {
