@@ -1120,3 +1120,193 @@ header h1 {
   margin-top: 24px;
   padding-bottom: 8px;
 }
+
+/* 思いつきメモ・ゴミ箱 共通 */
+.ideas-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ideas-header-row h2 {
+  font-size: 17px;
+  margin: 0;
+  color: var(--text);
+}
+
+.ideas-header-row button {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+#idea-add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#idea-add-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+#idea-add-form button {
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--secondary-dark);
+  color: white;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.idea-random-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--secondary-dark);
+  color: white;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.idea-pick {
+  background: var(--card);
+  border: 2px solid var(--secondary);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--secondary-dark);
+  animation: idea-pick-pop 300ms ease;
+}
+
+@keyframes idea-pick-pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+#idea-list, #trash-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.idea-item {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border-left: 4px solid var(--secondary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: box-shadow 300ms ease;
+}
+
+.idea-item.highlighted {
+  box-shadow: 0 0 0 3px var(--secondary);
+}
+
+.idea-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.idea-item-text {
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.idea-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.idea-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.idea-item-actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.idea-item-actions button:active {
+  background: var(--bg);
+}
+
+.trash-item {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border-left: 4px solid var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.85;
+}
+
+.trash-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.trash-item-text {
+  font-size: 15px;
+  word-break: break-word;
+  text-decoration: line-through;
+  color: var(--done);
+}
+
+.trash-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.trash-restore-btn {
+  flex-shrink: 0;
+  border: none;
+  background: var(--primary-dark);
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
