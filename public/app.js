@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -47,6 +47,22 @@ const calDayAddInput = document.getElementById('cal-day-add-input');
 const appFooterEl = document.getElementById('app-footer');
 appFooterEl.textContent = `Ver.${APP_VERSION}`;
 
+const ideasToggleBtn = document.getElementById('ideas-toggle');
+const ideasView = document.getElementById('ideas-view');
+const ideasCloseBtn = document.getElementById('ideas-close');
+const ideaAddForm = document.getElementById('idea-add-form');
+const ideaAddInput = document.getElementById('idea-add-input');
+const ideaRandomBtn = document.getElementById('idea-random-btn');
+const ideaPick = document.getElementById('idea-pick');
+const ideaList = document.getElementById('idea-list');
+const ideaEmptyMsg = document.getElementById('idea-empty-msg');
+
+const trashToggleBtn = document.getElementById('trash-toggle');
+const trashView = document.getElementById('trash-view');
+const trashCloseBtn = document.getElementById('trash-close');
+const trashList = document.getElementById('trash-list');
+const trashEmptyMsg = document.getElementById('trash-empty-msg');
+
 let myName = localStorage.getItem('yaritai_name') || '';
 if (!NAMES.includes(myName)) myName = '';
 let items = [];
@@ -63,14 +79,26 @@ let calendarMode = false;
 let calendarMonth = new Date();
 calendarMonth.setDate(1);
 let selectedDate = null;
+let ideasMode = false;
+let trashMode = false;
+let ideas = [];
+let trash = [];
+let pickedIdeaId = null;
 
 function otherName() {
   return NAMES.find((n) => n !== myName) || '相手';
 }
 
-// 標準表示（未達成・ふたり・検索なし）のときだけ手動並び替えを許可する
+// 標準表示（未達成・ふたり・検索なし・他ビューを開いていない）のときだけ手動並び替えを許可する
 function dragEnabled() {
-  return !calendarMode && currentFilter === 'active' && currentPerson === 'all' && !searchQuery;
+  return (
+    !calendarMode &&
+    !ideasMode &&
+    !trashMode &&
+    currentFilter === 'active' &&
+    currentPerson === 'all' &&
+    !searchQuery
+  );
 }
 
 function escapeHtml(str) {
@@ -149,7 +177,11 @@ function showApp() {
   privateToggleOtherEl.textContent = otherName();
   fetchItems();
   if (!pollTimer) {
-    pollTimer = setInterval(fetchItems, 4000);
+    pollTimer = setInterval(() => {
+      fetchItems();
+      if (ideasMode) fetchIdeas();
+      if (trashMode) fetchTrash();
+    }, 4000);
   }
 }
 
@@ -178,12 +210,37 @@ function renderCurrentView() {
   if (calendarMode) {
     renderCalendar();
     renderDayPanel();
+  } else if (ideasMode) {
+    renderIdeas();
+  } else if (trashMode) {
+    renderTrash();
   } else {
     render();
   }
 }
 
+// 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする（切り替え前の下準備）
+function closeAllViews() {
+  calendarMode = false;
+  ideasMode = false;
+  trashMode = false;
+  calendarView.classList.add('hidden');
+  ideasView.classList.add('hidden');
+  trashView.classList.add('hidden');
+  calendarToggleBtn.textContent = '📅';
+  calendarToggleBtn.title = 'カレンダー';
+}
+
+function showListView() {
+  closeAllViews();
+  listControls.classList.remove('hidden');
+  itemList.classList.remove('hidden');
+  triggerFadeIn(itemList);
+  render();
+}
+
 function openCalendar() {
+  closeAllViews();
   calendarMode = true;
   listControls.classList.add('hidden');
   itemList.classList.add('hidden');
@@ -197,14 +254,7 @@ function openCalendar() {
 }
 
 function closeCalendar() {
-  calendarMode = false;
-  calendarView.classList.add('hidden');
-  listControls.classList.remove('hidden');
-  itemList.classList.remove('hidden');
-  calendarToggleBtn.textContent = '📅';
-  calendarToggleBtn.title = 'カレンダー';
-  triggerFadeIn(itemList);
-  render();
+  showListView();
 }
 
 calendarToggleBtn.addEventListener('click', () => {
@@ -217,6 +267,56 @@ calendarToggleBtn.addEventListener('click', () => {
 
 calCloseBtn.addEventListener('click', closeCalendar);
 
+function openIdeas() {
+  closeAllViews();
+  ideasMode = true;
+  listControls.classList.add('hidden');
+  itemList.classList.add('hidden');
+  emptyMsg.classList.add('hidden');
+  ideasView.classList.remove('hidden');
+  triggerFadeIn(ideasView);
+  fetchIdeas();
+}
+
+function closeIdeas() {
+  showListView();
+}
+
+ideasToggleBtn.addEventListener('click', () => {
+  if (ideasMode) {
+    closeIdeas();
+  } else {
+    openIdeas();
+  }
+});
+
+ideasCloseBtn.addEventListener('click', closeIdeas);
+
+function openTrash() {
+  closeAllViews();
+  trashMode = true;
+  listControls.classList.add('hidden');
+  itemList.classList.add('hidden');
+  emptyMsg.classList.add('hidden');
+  trashView.classList.remove('hidden');
+  triggerFadeIn(trashView);
+  fetchTrash();
+}
+
+function closeTrash() {
+  showListView();
+}
+
+trashToggleBtn.addEventListener('click', () => {
+  if (trashMode) {
+    closeTrash();
+  } else {
+    openTrash();
+  }
+});
+
+trashCloseBtn.addEventListener('click', closeTrash);
+
 async function fetchItems() {
   try {
     const res = await fetch('/api/items?viewer=' + encodeURIComponent(myName));
@@ -226,6 +326,26 @@ async function fetchItems() {
     }
   } catch (e) {
     console.error('取得失敗', e);
+  }
+}
+
+async function fetchIdeas() {
+  try {
+    const res = await fetch('/api/ideas');
+    ideas = await res.json();
+    if (ideasMode) renderIdeas();
+  } catch (e) {
+    console.error('思いつきメモの取得失敗', e);
+  }
+}
+
+async function fetchTrash() {
+  try {
+    const res = await fetch('/api/trash?viewer=' + encodeURIComponent(myName));
+    trash = await res.json();
+    if (trashMode) renderTrash();
+  } catch (e) {
+    console.error('ゴミ箱の取得失敗', e);
   }
 }
 
@@ -278,6 +398,43 @@ async function deleteItem(id) {
   await fetch('/api/items/' + id, { method: 'DELETE' });
   items = items.filter((i) => i.id !== id);
   renderCurrentView();
+}
+
+async function restoreItem(id) {
+  await fetch(`/api/items/${id}/restore`, { method: 'POST' });
+  trash = trash.filter((i) => i.id !== id);
+  renderTrash();
+}
+
+// ---- 思いつきメモ ----
+async function addIdea(text) {
+  const res = await fetch('/api/ideas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, name: myName }),
+  });
+  const newIdea = await res.json();
+  ideas.unshift(newIdea);
+  renderIdeas();
+}
+
+async function deleteIdea(id) {
+  await fetch('/api/ideas/' + id, { method: 'DELETE' });
+  ideas = ideas.filter((i) => i.id !== id);
+  renderIdeas();
+}
+
+async function moveIdeaToList(id, keepOriginal) {
+  await fetch(`/api/ideas/${id}/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: myName, keepOriginal }),
+  });
+  if (!keepOriginal) {
+    ideas = ideas.filter((i) => i.id !== id);
+    renderIdeas();
+  }
+  await fetchItems();
 }
 
 async function addComment(itemId, text) {
@@ -598,7 +755,7 @@ function handleItemClick(e) {
     const item = items.find((i) => i.id === id);
     setStatus(id, item && item.status === 'abandoned' ? 'active' : 'abandoned');
   } else if (e.target.classList.contains('delete-btn')) {
-    if (confirm('本当に削除しますか？')) deleteItem(id);
+    if (confirm('ゴミ箱に移動します。よろしいですか？（7日以内なら元に戻せます）')) deleteItem(id);
   } else if (e.target.classList.contains('edit-btn')) {
     startEdit(li, id);
   } else if (e.target.classList.contains('comment-delete-btn')) {
@@ -616,6 +773,92 @@ function handleItemClick(e) {
 
 itemList.addEventListener('click', handleItemClick);
 calDayItems.addEventListener('click', handleItemClick);
+
+// ---- 思いつきメモ ----
+function ideaToHtml(idea) {
+  const highlightClass = idea.id === pickedIdeaId ? 'highlighted' : '';
+  return `
+    <li class="idea-item ${highlightClass}" data-id="${escapeHtml(idea.id)}">
+      <div class="idea-item-body">
+        <div class="idea-item-text">${escapeHtml(idea.text)}</div>
+        <div class="idea-item-meta">${escapeHtml(idea.addedBy)} ・ ${formatDate(idea.createdAt)}</div>
+      </div>
+      <div class="idea-item-actions">
+        <button type="button" class="idea-move-btn" title="やりたいことリストへ">➡️</button>
+        <button type="button" class="idea-delete-btn" title="削除">🗑️</button>
+      </div>
+    </li>
+  `;
+}
+
+function renderIdeas() {
+  ideaEmptyMsg.classList.toggle('hidden', ideas.length > 0);
+  ideaList.innerHTML = ideas.map(ideaToHtml).join('');
+}
+
+ideaAddForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = ideaAddInput.value.trim();
+  if (!text) return;
+  ideaAddInput.value = '';
+  addIdea(text);
+});
+
+ideaRandomBtn.addEventListener('click', () => {
+  if (!ideas.length) {
+    ideaPick.classList.add('hidden');
+    return;
+  }
+  const picked = ideas[Math.floor(Math.random() * ideas.length)];
+  pickedIdeaId = picked.id;
+  ideaPick.classList.remove('hidden');
+  ideaPick.textContent = `🎲 ${picked.text}`;
+  triggerFadeIn(ideaPick);
+  renderIdeas();
+  const li = ideaList.querySelector(`.idea-item[data-id="${picked.id}"]`);
+  if (li) li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+ideaList.addEventListener('click', (e) => {
+  const li = e.target.closest('.idea-item');
+  if (!li) return;
+  const id = li.dataset.id;
+
+  if (e.target.classList.contains('idea-delete-btn')) {
+    if (confirm('この思いつきメモを削除しますか？')) deleteIdea(id);
+  } else if (e.target.classList.contains('idea-move-btn')) {
+    const keepOriginal = confirm('やりたいことリストへ移動します。元の思いつきメモにも残しますか？\n（OK＝残す／キャンセル＝メモからは消す）');
+    moveIdeaToList(id, keepOriginal);
+  }
+});
+
+// ---- ゴミ箱 ----
+function trashItemToHtml(item) {
+  const remainingMs = item.deletedAt + 7 * 24 * 60 * 60 * 1000 - Date.now();
+  const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  return `
+    <li class="trash-item" data-id="${escapeHtml(item.id)}">
+      <div class="trash-item-body">
+        <div class="trash-item-text">${escapeHtml(item.text)}</div>
+        <div class="trash-item-meta">${escapeHtml(item.addedBy)}さんのタスク ・ 残り${remainingDays}日で完全に削除されます</div>
+      </div>
+      <button type="button" class="trash-restore-btn">元に戻す</button>
+    </li>
+  `;
+}
+
+function renderTrash() {
+  trashEmptyMsg.classList.toggle('hidden', trash.length > 0);
+  trashList.innerHTML = trash.map(trashItemToHtml).join('');
+}
+
+trashList.addEventListener('click', (e) => {
+  const li = e.target.closest('.trash-item');
+  if (!li) return;
+  if (e.target.classList.contains('trash-restore-btn')) {
+    restoreItem(li.dataset.id);
+  }
+});
 
 // ---- 手動並び替え（ドラッグ&ドロップ） ----
 // つまんだカードは指に追従してなめらかに浮かせ、他のカードは枠線だけの
