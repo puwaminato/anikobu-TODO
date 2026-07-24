@@ -6,7 +6,9 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
+const IDEAS_FILE = path.join(__dirname, 'ideas.json');
 const DATABASE_URL = process.env.DATABASE_URL;
+const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // ゴミ箱の保持期間（7日）
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -37,7 +39,8 @@ async function initDb() {
       note TEXT DEFAULT '',
       due_date TEXT,
       sort_order DOUBLE PRECISION,
-      repeat_type TEXT
+      repeat_type TEXT,
+      deleted_at BIGINT
     )
   `);
   await pool.query(`
@@ -50,10 +53,19 @@ async function initDb() {
       stamp TEXT
     )
   `);
-  // 既存テーブルに stamp / sort_order / repeat_type 列がなければ追加する（マイグレーション）
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ideas (
+      id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      added_by TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )
+  `);
+  // 既存テーブルに stamp / sort_order / repeat_type / deleted_at 列がなければ追加する（マイグレーション）
   await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS stamp TEXT`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS sort_order DOUBLE PRECISION`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS repeat_type TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS deleted_at BIGINT`);
 }
 
 // スタンプの種類（id → 表示用ラベル）。追加時のバリデーションにも使う
@@ -78,6 +90,7 @@ function rowToItem(row) {
     dueDate: row.due_date,
     sortOrder: row.sort_order !== null && row.sort_order !== undefined ? Number(row.sort_order) : null,
     repeat: row.repeat_type || null,
+    deletedAt: row.deleted_at !== null && row.deleted_at !== undefined ? Number(row.deleted_at) : null,
   };
 }
 
@@ -87,6 +100,15 @@ function rowToComment(row) {
     author: row.author,
     text: row.text,
     stamp: row.stamp || null,
+    createdAt: Number(row.created_at),
+  };
+}
+
+function rowToIdea(row) {
+  return {
+    id: row.id,
+    text: row.text,
+    addedBy: row.added_by,
     createdAt: Number(row.created_at),
   };
 }
@@ -117,6 +139,20 @@ function loadItemsFromFile() {
 
 function saveItemsToFile(items) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf-8');
+}
+
+function loadIdeasFromFile() {
+  if (!fs.existsSync(IDEAS_FILE)) return [];
+  try {
+    const raw = fs.readFileSync(IDEAS_FILE, 'utf-8');
+    return raw.trim() ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveIdeasToFile(ideas) {
+  fs.writeFileSync(IDEAS_FILE, JSON.stringify(ideas, null, 2), 'utf-8');
 }
 
 // ---- データ操作（pool があれば Postgres、なければファイル） ----
@@ -150,6 +186,40 @@ async function insertItem(item) {
   const items = loadItemsFromFile();
   items.push(item);
   saveItemsToFile(items);
+}
+
+// ---- 思いつきメモ ----
+async function getAllIdeas() {
+  if (pool) {
+    const { rows } = await pool.query('SELECT * FROM ideas ORDER BY created_at DESC');
+    return rows.map(rowToIdea);
+  }
+  return loadIdeasFromFile();
+}
+
+async function insertIdea(idea) {
+  if (pool) {
+    await pool.query(
+      `INSERT INTO ideas (id, text, added_by, created_at) VALUES ($1,$2,$3,$4)`,
+      [idea.id, idea.text, idea.addedBy, idea.createdAt]
+    );
+    return;
+  }
+  const ideas = loadIdeasFromFile();
+  ideas.push(idea);
+  saveIdeasToFile(ideas);
+}
+
+async function removeIdea(id) {
+  if (pool) {
+    const { rowCount } = await pool.query('DELETE FROM ideas WHERE id=$1', [id]);
+    return rowCount > 0;
+  }
+  const ideas = loadIdeasFromFile();
+  const filtered = ideas.filter((i) => i.id !== id);
+  if (filtered.length === ideas.length) return false;
+  saveIdeasToFile(filtered);
+  return true;
 }
 
 async function addCommentToItem(itemId, author, text, stamp = null) {
@@ -287,7 +357,8 @@ async function reorderItems(ids) {
   saveItemsToFile(items);
 }
 
-async function removeItem(id) {
+// 完全に削除する（ゴミ箱からの自動パージ用。API からは呼ばない）
+async function purgeItem(id) {
   if (pool) {
     const { rowCount } = await pool.query('DELETE FROM items WHERE id=$1', [id]);
     return rowCount > 0;
@@ -297,6 +368,46 @@ async function removeItem(id) {
   if (filtered.length === items.length) return false;
   saveItemsToFile(filtered);
   return true;
+}
+
+// ゴミ箱に移動する（論理削除）
+async function trashItem(id) {
+  if (pool) {
+    const { rowCount } = await pool.query('UPDATE items SET deleted_at=$2 WHERE id=$1', [id, Date.now()]);
+    return rowCount > 0;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === id);
+  if (!item) return false;
+  item.deletedAt = Date.now();
+  saveItemsToFile(items);
+  return true;
+}
+
+// ゴミ箱から元に戻す
+async function restoreItem(id) {
+  if (pool) {
+    const { rows } = await pool.query('UPDATE items SET deleted_at=NULL WHERE id=$1 RETURNING *', [id]);
+    return rows[0] ? rowToItem(rows[0]) : null;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === id);
+  if (!item) return null;
+  item.deletedAt = null;
+  saveItemsToFile(items);
+  return item;
+}
+
+// 削除から7日経過したものを完全に削除する
+async function purgeOldTrash() {
+  const cutoff = Date.now() - TRASH_RETENTION_MS;
+  if (pool) {
+    await pool.query('DELETE FROM items WHERE deleted_at IS NOT NULL AND deleted_at < $1', [cutoff]);
+    return;
+  }
+  const items = loadItemsFromFile();
+  const kept = items.filter((i) => !i.deletedAt || i.deletedAt >= cutoff);
+  if (kept.length !== items.length) saveItemsToFile(kept);
 }
 
 // ---- iPhoneカレンダー登録用の .ics ファイル生成 ----
@@ -369,13 +480,33 @@ function compareItems(a, b) {
   return (b.closedAt || 0) - (a.closedAt || 0);
 }
 
-// 一覧取得（viewer本人の分は private も含め、他人の private は除外）
+// 一覧取得（viewer本人の分は private も含め、他人の private は除外、ゴミ箱内は除外）
 app.get('/api/items', async (req, res) => {
   const viewer = (req.query.viewer || '').trim();
   const items = (await getAllItems())
+    .filter((i) => !i.deletedAt)
     .filter((i) => i.visibility !== 'private' || i.addedBy === viewer)
     .sort(compareItems);
   res.json(items);
+});
+
+// ゴミ箱の一覧取得（削除から7日以内のもの。古いものはこのタイミングで完全削除する）
+app.get('/api/trash', async (req, res) => {
+  const viewer = (req.query.viewer || '').trim();
+  await purgeOldTrash();
+  const items = (await getAllItems())
+    .filter((i) => i.deletedAt)
+    .filter((i) => i.visibility !== 'private' || i.addedBy === viewer)
+    .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+  res.json(items);
+});
+
+// ゴミ箱から元に戻す
+app.post('/api/items/:id/restore', async (req, res) => {
+  const { id } = req.params;
+  const updated = await restoreItem(id);
+  if (!updated) return res.status(404).json({ error: 'not found' });
+  res.json(updated);
 });
 
 // 手動並び替え（未達成タスクのドラッグ&ドロップ）。渡された id の順番どおりに並び順を保存する
@@ -480,10 +611,10 @@ app.put('/api/items/:id', async (req, res) => {
   res.json(updated);
 });
 
-// 削除
+// 削除（ゴミ箱へ移動。物理削除はしない）
 app.delete('/api/items/:id', async (req, res) => {
   const { id } = req.params;
-  const ok = await removeItem(id);
+  const ok = await trashItem(id);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });
@@ -542,6 +673,66 @@ app.delete('/api/items/:id/comments/:commentId', async (req, res) => {
   const ok = await removeComment(id, commentId);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
+});
+
+// ---- 思いつきメモ ----
+
+// 一覧取得
+app.get('/api/ideas', async (req, res) => {
+  const ideas = await getAllIdeas();
+  res.json(ideas);
+});
+
+// 追加
+app.post('/api/ideas', async (req, res) => {
+  const { text, name } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'text is required' });
+  }
+  const newIdea = {
+    id: crypto.randomUUID(),
+    text: text.trim(),
+    addedBy: (name || '').trim() || '匿名',
+    createdAt: Date.now(),
+  };
+  await insertIdea(newIdea);
+  res.status(201).json(newIdea);
+});
+
+// 削除
+app.delete('/api/ideas/:id', async (req, res) => {
+  const { id } = req.params;
+  const ok = await removeIdea(id);
+  if (!ok) return res.status(404).json({ error: 'not found' });
+  res.status(204).end();
+});
+
+// やりたいことリストへ移動（keepOriginal が false の場合は思いつきメモ側から削除する）
+app.post('/api/ideas/:id/move', async (req, res) => {
+  const { id } = req.params;
+  const { name, keepOriginal } = req.body;
+  const ideas = await getAllIdeas();
+  const idea = ideas.find((i) => i.id === id);
+  if (!idea) return res.status(404).json({ error: 'not found' });
+
+  const newItem = {
+    id: crypto.randomUUID(),
+    text: idea.text,
+    addedBy: (name || '').trim() || '匿名',
+    createdAt: Date.now(),
+    status: 'active',
+    closedBy: null,
+    closedAt: null,
+    visibility: 'shared',
+    note: '',
+    dueDate: null,
+    sortOrder: null,
+    repeat: null,
+    comments: [],
+  };
+  await insertItem(newItem);
+  if (!keepOriginal) await removeIdea(id);
+  res.status(201).json(newItem);
 });
 
 initDb()
