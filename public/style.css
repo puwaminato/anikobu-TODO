@@ -851,7 +851,9 @@ header h1 {
 }
 
 .item-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 40px);
+  grid-auto-rows: 40px;
   flex-shrink: 0;
 }
 
