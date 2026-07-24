@@ -36,7 +36,8 @@ async function initDb() {
       visibility TEXT NOT NULL DEFAULT 'shared',
       note TEXT DEFAULT '',
       due_date TEXT,
-      sort_order DOUBLE PRECISION
+      sort_order DOUBLE PRECISION,
+      repeat_type TEXT
     )
   `);
   await pool.query(`
@@ -49,9 +50,10 @@ async function initDb() {
       stamp TEXT
     )
   `);
-  // 既存テーブルに stamp / sort_order 列がなければ追加する（マイグレーション）
+  // 既存テーブルに stamp / sort_order / repeat_type 列がなければ追加する（マイグレーション）
   await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS stamp TEXT`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS sort_order DOUBLE PRECISION`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS repeat_type TEXT`);
 }
 
 // スタンプの種類（id → 表示用ラベル）。追加時のバリデーションにも使う
@@ -75,6 +77,7 @@ function rowToItem(row) {
     note: row.note || '',
     dueDate: row.due_date,
     sortOrder: row.sort_order !== null && row.sort_order !== undefined ? Number(row.sort_order) : null,
+    repeat: row.repeat_type || null,
   };
 }
 
@@ -138,9 +141,9 @@ async function getAllItems() {
 async function insertItem(item) {
   if (pool) {
     await pool.query(
-      `INSERT INTO items (id, text, added_by, created_at, status, closed_by, closed_at, visibility, note, due_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [item.id, item.text, item.addedBy, item.createdAt, item.status, item.closedBy, item.closedAt, item.visibility, item.note, item.dueDate]
+      `INSERT INTO items (id, text, added_by, created_at, status, closed_by, closed_at, visibility, note, due_date, repeat_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [item.id, item.text, item.addedBy, item.createdAt, item.status, item.closedBy, item.closedAt, item.visibility, item.note, item.dueDate, item.repeat]
     );
     return;
   }
@@ -221,11 +224,11 @@ async function updateItemStatus(id, status, closedBy, closedAt) {
   return item;
 }
 
-async function updateItemContent(id, text, note, dueDate) {
+async function updateItemContent(id, text, note, dueDate, repeat) {
   if (pool) {
     const { rows } = await pool.query(
-      `UPDATE items SET text=$2, note=$3, due_date=$4 WHERE id=$1 RETURNING *`,
-      [id, text, note, dueDate]
+      `UPDATE items SET text=$2, note=$3, due_date=$4, repeat_type=$5 WHERE id=$1 RETURNING *`,
+      [id, text, note, dueDate, repeat]
     );
     return rows[0] ? rowToItem(rows[0]) : null;
   }
@@ -235,8 +238,21 @@ async function updateItemContent(id, text, note, dueDate) {
   item.text = text;
   item.note = note;
   item.dueDate = dueDate;
+  item.repeat = repeat;
   saveItemsToFile(items);
   return item;
+}
+
+// 繰り返し設定を解除する（達成して次回分を作った直後、二重生成を防ぐため）
+async function clearItemRepeat(id) {
+  if (pool) {
+    await pool.query('UPDATE items SET repeat_type=NULL WHERE id=$1', [id]);
+    return;
+  }
+  const items = loadItemsFromFile();
+  const item = items.find((i) => i.id === id);
+  if (item) item.repeat = null;
+  saveItemsToFile(items);
 }
 
 async function updateItemVisibility(id, visibility) {
@@ -322,6 +338,18 @@ function buildIcs(item) {
   return lines.join('\r\n') + '\r\n';
 }
 
+// 繰り返し設定（daily/weekly/monthly）に応じて次の期限日を計算する
+const REPEAT_TYPES = ['daily', 'weekly', 'monthly'];
+
+function nextDueDateOf(dueDate, repeat) {
+  const [y, m, d] = dueDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (repeat === 'daily') dt.setUTCDate(dt.getUTCDate() + 1);
+  else if (repeat === 'weekly') dt.setUTCDate(dt.getUTCDate() + 7);
+  else if (repeat === 'monthly') dt.setUTCMonth(dt.getUTCMonth() + 1);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
 // 未達成は「手動で並び替えた順（あれば）」＞「期限が近い順」、達成済み・頓挫は対応した日が新しい順
 function compareItems(a, b) {
   const aActive = a.status === 'active';
@@ -362,10 +390,12 @@ app.post('/api/items/reorder', async (req, res) => {
 
 // 追加
 app.post('/api/items', async (req, res) => {
-  const { text, name, visibility, note, dueDate } = req.body;
+  const { text, name, visibility, note, dueDate, repeat } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'text is required' });
   }
+  // 繰り返しは期限がある場合のみ意味を持つ
+  const repeatValue = dueDate && REPEAT_TYPES.includes(repeat) ? repeat : null;
   const newItem = {
     id: crypto.randomUUID(),
     text: text.trim(),
@@ -378,6 +408,7 @@ app.post('/api/items', async (req, res) => {
     note: (note || '').trim(),
     dueDate: dueDate || null,
     sortOrder: null,
+    repeat: repeatValue,
     comments: [],
   };
   await insertItem(newItem);
@@ -397,6 +428,30 @@ app.patch('/api/items/:id', async (req, res) => {
     const closedAt = status === 'active' ? null : Date.now();
     const updated = await updateItemStatus(id, status, closedBy, closedAt);
     if (!updated) return res.status(404).json({ error: 'not found' });
+
+    // 繰り返し設定のあるタスクを達成したら、次回分を自動で作成する
+    if (status === 'done' && updated.repeat && updated.dueDate) {
+      const nextItem = {
+        id: crypto.randomUUID(),
+        text: updated.text,
+        addedBy: updated.addedBy,
+        createdAt: Date.now(),
+        status: 'active',
+        closedBy: null,
+        closedAt: null,
+        visibility: updated.visibility,
+        note: updated.note,
+        dueDate: nextDueDateOf(updated.dueDate, updated.repeat),
+        sortOrder: null,
+        repeat: updated.repeat,
+        comments: [],
+      };
+      await insertItem(nextItem);
+      // 達成済みの方は繰り返し設定を外す（トグルで再度達成にしても二重生成しない）
+      await clearItemRepeat(id);
+      updated.repeat = null;
+    }
+
     return res.json(updated);
   }
 
@@ -412,14 +467,15 @@ app.patch('/api/items/:id', async (req, res) => {
   res.status(400).json({ error: 'status or visibility is required' });
 });
 
-// 編集（本文・メモ・期限）
+// 編集（本文・メモ・期限・繰り返し）
 app.put('/api/items/:id', async (req, res) => {
   const { id } = req.params;
-  const { text, note, dueDate } = req.body;
+  const { text, note, dueDate, repeat } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'text is required' });
   }
-  const updated = await updateItemContent(id, text.trim(), (note || '').trim(), dueDate || null);
+  const repeatValue = dueDate && REPEAT_TYPES.includes(repeat) ? repeat : null;
+  const updated = await updateItemContent(id, text.trim(), (note || '').trim(), dueDate || null, repeatValue);
   if (!updated) return res.status(404).json({ error: 'not found' });
   res.json(updated);
 });
