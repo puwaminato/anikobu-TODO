@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>やりたいことリスト</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=1.3.2">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -32,7 +32,9 @@
         <div class="user-badge">
           <span id="current-name"></span>さん
           <button id="change-name" title="名前を変更">変更</button>
+          <button id="ideas-toggle" title="思いつきメモ">💡</button>
           <button id="calendar-toggle" title="カレンダー">📅</button>
+          <button id="trash-toggle" title="ゴミ箱">🗑️</button>
         </div>
       </header>
 
@@ -108,6 +110,31 @@
         <button type="submit">追加</button>
       </form>
     </div>
+  </div>
+
+  <div id="ideas-view" class="hidden">
+    <div class="ideas-header-row">
+      <h2>💡 思いつきメモ</h2>
+      <button type="button" id="ideas-close" title="閉じる">✕</button>
+    </div>
+    <form id="idea-add-form">
+      <input type="text" id="idea-add-input" placeholder="思いついたことを入力…" maxlength="200" autocomplete="off">
+      <button type="submit">追加</button>
+    </form>
+    <button type="button" id="idea-random-btn" class="idea-random-btn">🎲 ランダムに1つ選ぶ</button>
+    <div id="idea-pick" class="idea-pick hidden"></div>
+    <ul id="idea-list"></ul>
+    <p id="idea-empty-msg" class="hidden">まだ思いつきメモがありません。</p>
+  </div>
+
+  <div id="trash-view" class="hidden">
+    <div class="ideas-header-row">
+      <h2>🗑️ ゴミ箱</h2>
+      <button type="button" id="trash-close" title="閉じる">✕</button>
+    </div>
+    <p class="repeat-hint">削除してから7日経過したものは自動的に完全に消えます。</p>
+    <ul id="trash-list"></ul>
+    <p id="trash-empty-msg" class="hidden">ゴミ箱は空です。</p>
   </div>
 
   <footer id="app-footer" class="app-footer"></footer>
