@@ -1,5 +1,5 @@
 const NAMES = ['はる', 'みなと'];
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 const STAMPS = [
   { id: 'ok', file: 'ok.png', label: 'OK' },
@@ -8,6 +8,8 @@ const STAMPS = [
   { id: 'heart', file: 'heart.png', label: 'だいすき' },
 ];
 const STAMP_FILE = Object.fromEntries(STAMPS.map((s) => [s.id, s.file]));
+
+const REPEAT_LABELS = { daily: '毎日', weekly: '毎週', monthly: '毎月' };
 
 const nameGate = document.getElementById('name-gate');
 const nameChoiceBtns = document.querySelectorAll('.name-choice-btn');
@@ -20,6 +22,7 @@ const detailsToggle = document.getElementById('details-toggle');
 const addDetails = document.getElementById('add-details');
 const addNote = document.getElementById('add-note');
 const addDue = document.getElementById('add-due');
+const addRepeat = document.getElementById('add-repeat');
 const privateCheckbox = document.getElementById('private-checkbox');
 const privateToggleOtherEl = document.getElementById('private-toggle-other');
 const itemList = document.getElementById('item-list');
@@ -226,11 +229,11 @@ async function fetchItems() {
   }
 }
 
-async function addItem(text, isPrivate, note, dueDate) {
+async function addItem(text, isPrivate, note, dueDate, repeat) {
   const res = await fetch('/api/items', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, name: myName, visibility: isPrivate ? 'private' : 'shared', note, dueDate }),
+    body: JSON.stringify({ text, name: myName, visibility: isPrivate ? 'private' : 'shared', note, dueDate, repeat }),
   });
   const newItem = await res.json();
   items.unshift(newItem);
@@ -238,15 +241,13 @@ async function addItem(text, isPrivate, note, dueDate) {
 }
 
 async function setStatus(id, status) {
-  const res = await fetch('/api/items/' + id, {
+  await fetch('/api/items/' + id, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, name: myName }),
   });
-  const updated = await res.json();
-  const idx = items.findIndex((i) => i.id === id);
-  if (idx !== -1) items[idx] = updated;
-  renderCurrentView();
+  // 繰り返しタスクを達成した場合、サーバー側で次回分が作られるため一覧を丸ごと取り直す
+  await fetchItems();
 }
 
 async function setVisibility(id, visibility) {
@@ -261,11 +262,11 @@ async function setVisibility(id, visibility) {
   renderCurrentView();
 }
 
-async function editItem(id, { text, note, dueDate }) {
+async function editItem(id, { text, note, dueDate, repeat }) {
   const res = await fetch('/api/items/' + id, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, note, dueDate }),
+    body: JSON.stringify({ text, note, dueDate, repeat }),
   });
   const updated = await res.json();
   const idx = items.findIndex((i) => i.id === id);
@@ -340,13 +341,15 @@ addForm.addEventListener('submit', (e) => {
   const isPrivate = privateCheckbox.checked;
   const note = addNote.value.trim();
   const dueDate = addDue.value || null;
+  const repeat = addRepeat.value || null;
   addInput.value = '';
   privateCheckbox.checked = false;
   addNote.value = '';
   addDue.value = '';
+  addRepeat.value = '';
   addDetails.classList.add('hidden');
   detailsToggle.textContent = '＋ メモ・期限を追加';
-  addItem(text, isPrivate, note, dueDate);
+  addItem(text, isPrivate, note, dueDate, repeat);
 });
 
 filterBtns.forEach((btn) => {
@@ -405,6 +408,11 @@ function dueBadgeHtml(item) {
   }
   const label = cls === 'overdue' ? '期限切れ' : '期限';
   return `<span class="due-badge ${cls}">📅 ${label} ${formatDueDate(item.dueDate)}</span>`;
+}
+
+function repeatBadgeHtml(item) {
+  if (!item.repeat) return '';
+  return `<span class="repeat-badge">🔁 ${REPEAT_LABELS[item.repeat] || ''}</span>`;
 }
 
 function commentBodyHtml(c) {
@@ -528,6 +536,7 @@ function itemToHtml(item) {
           <div class="item-text">${lockIcon}${escapeHtml(item.text)}</div>
           ${noteHtml}
           ${dueBadgeHtml(item)}
+          ${repeatBadgeHtml(item)}
           ${commentCountHtml(item)}
         </div>
         <div class="item-actions">
@@ -750,6 +759,24 @@ function startEdit(li, id) {
   dueInput.value = item.dueDate || '';
   dueRow.appendChild(dueInput);
 
+  const repeatRow = document.createElement('div');
+  repeatRow.className = 'edit-form-row';
+  repeatRow.appendChild(document.createTextNode('🔁 繰り返し '));
+  const repeatInput = document.createElement('select');
+  [
+    ['', 'なし'],
+    ['daily', '毎日'],
+    ['weekly', '毎週'],
+    ['monthly', '毎月'],
+  ].forEach(([value, label]) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    if ((item.repeat || '') === value) opt.selected = true;
+    repeatInput.appendChild(opt);
+  });
+  repeatRow.appendChild(repeatInput);
+
   const actions = document.createElement('div');
   actions.className = 'edit-form-actions';
   const cancelBtn = document.createElement('button');
@@ -762,7 +789,7 @@ function startEdit(li, id) {
   saveBtn.textContent = '保存';
   actions.append(cancelBtn, saveBtn);
 
-  form.append(textInput, noteInput, dueRow, actions);
+  form.append(textInput, noteInput, dueRow, repeatRow, actions);
   li.innerHTML = '';
   li.appendChild(form);
 
@@ -781,7 +808,12 @@ function startEdit(li, id) {
       return;
     }
     editingId = null;
-    editItem(id, { text, note: noteInput.value.trim(), dueDate: dueInput.value || null });
+    editItem(id, {
+      text,
+      note: noteInput.value.trim(),
+      dueDate: dueInput.value || null,
+      repeat: repeatInput.value || null,
+    });
   });
 }
 
