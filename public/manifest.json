@@ -1,0 +1,11 @@
+{
+  "name": "やりたいことリスト",
+  "short_name": "やりたいこと",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5fbfc",
+  "theme_color": "#4DD7E3",
+  "icons": [
+    { "src": "icon.png", "sizes": "any", "type": "image/png" }
+  ]
+}
