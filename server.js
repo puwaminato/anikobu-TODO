@@ -58,7 +58,8 @@ async function initDb() {
       id TEXT PRIMARY KEY,
       text TEXT NOT NULL,
       added_by TEXT NOT NULL,
-      created_at BIGINT NOT NULL
+      created_at BIGINT NOT NULL,
+      deleted_at BIGINT
     )
   `);
   // 既存テーブルに stamp / sort_order / repeat_type / deleted_at 列がなければ追加する（マイグレーション）
@@ -66,6 +67,7 @@ async function initDb() {
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS sort_order DOUBLE PRECISION`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS repeat_type TEXT`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS deleted_at BIGINT`);
+  await pool.query(`ALTER TABLE ideas ADD COLUMN IF NOT EXISTS deleted_at BIGINT`);
 }
 
 // スタンプの種類（id → 表示用ラベル）。追加時のバリデーションにも使う
@@ -110,6 +112,7 @@ function rowToIdea(row) {
     text: row.text,
     addedBy: row.added_by,
     createdAt: Number(row.created_at),
+    deletedAt: row.deleted_at !== null && row.deleted_at !== undefined ? Number(row.deleted_at) : null,
   };
 }
 
@@ -220,6 +223,46 @@ async function removeIdea(id) {
   if (filtered.length === ideas.length) return false;
   saveIdeasToFile(filtered);
   return true;
+}
+
+// ゴミ箱に移動する（論理削除）
+async function trashIdea(id) {
+  if (pool) {
+    const { rowCount } = await pool.query('UPDATE ideas SET deleted_at=$2 WHERE id=$1', [id, Date.now()]);
+    return rowCount > 0;
+  }
+  const ideas = loadIdeasFromFile();
+  const idea = ideas.find((i) => i.id === id);
+  if (!idea) return false;
+  idea.deletedAt = Date.now();
+  saveIdeasToFile(ideas);
+  return true;
+}
+
+// ゴミ箱から元に戻す
+async function restoreIdea(id) {
+  if (pool) {
+    const { rows } = await pool.query('UPDATE ideas SET deleted_at=NULL WHERE id=$1 RETURNING *', [id]);
+    return rows[0] ? rowToIdea(rows[0]) : null;
+  }
+  const ideas = loadIdeasFromFile();
+  const idea = ideas.find((i) => i.id === id);
+  if (!idea) return null;
+  idea.deletedAt = null;
+  saveIdeasToFile(ideas);
+  return idea;
+}
+
+// 削除から7日経過した思いつきメモを完全に削除する
+async function purgeOldIdeaTrash() {
+  const cutoff = Date.now() - TRASH_RETENTION_MS;
+  if (pool) {
+    await pool.query('DELETE FROM ideas WHERE deleted_at IS NOT NULL AND deleted_at < $1', [cutoff]);
+    return;
+  }
+  const ideas = loadIdeasFromFile();
+  const kept = ideas.filter((i) => !i.deletedAt || i.deletedAt >= cutoff);
+  if (kept.length !== ideas.length) saveIdeasToFile(kept);
 }
 
 async function addCommentToItem(itemId, author, text, stamp = null) {
@@ -490,15 +533,20 @@ app.get('/api/items', async (req, res) => {
   res.json(items);
 });
 
-// ゴミ箱の一覧取得（削除から7日以内のもの。古いものはこのタイミングで完全削除する）
+// ゴミ箱の一覧取得（削除から7日以内のもの。やりたいことリストと思いつきメモの両方を含む。古いものはこのタイミングで完全削除する）
 app.get('/api/trash', async (req, res) => {
   const viewer = (req.query.viewer || '').trim();
   await purgeOldTrash();
-  const items = (await getAllItems())
+  await purgeOldIdeaTrash();
+  const trashedItems = (await getAllItems())
     .filter((i) => i.deletedAt)
     .filter((i) => i.visibility !== 'private' || i.addedBy === viewer)
-    .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
-  res.json(items);
+    .map((i) => ({ ...i, type: 'item' }));
+  const trashedIdeas = (await getAllIdeas())
+    .filter((i) => i.deletedAt)
+    .map((i) => ({ ...i, type: 'idea' }));
+  const combined = [...trashedItems, ...trashedIdeas].sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+  res.json(combined);
 });
 
 // ゴミ箱から元に戻す
@@ -677,9 +725,9 @@ app.delete('/api/items/:id/comments/:commentId', async (req, res) => {
 
 // ---- 思いつきメモ ----
 
-// 一覧取得
+// 一覧取得（ゴミ箱内は除外）
 app.get('/api/ideas', async (req, res) => {
-  const ideas = await getAllIdeas();
+  const ideas = (await getAllIdeas()).filter((i) => !i.deletedAt);
   res.json(ideas);
 });
 
@@ -699,12 +747,20 @@ app.post('/api/ideas', async (req, res) => {
   res.status(201).json(newIdea);
 });
 
-// 削除
+// 削除（ゴミ箱へ移動。物理削除はしない）
 app.delete('/api/ideas/:id', async (req, res) => {
   const { id } = req.params;
-  const ok = await removeIdea(id);
+  const ok = await trashIdea(id);
   if (!ok) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
+});
+
+// ゴミ箱から元に戻す
+app.post('/api/ideas/:id/restore', async (req, res) => {
+  const { id } = req.params;
+  const updated = await restoreIdea(id);
+  if (!updated) return res.status(404).json({ error: 'not found' });
+  res.json(updated);
 });
 
 // やりたいことリストへ移動（keepOriginal が false の場合は思いつきメモ側から削除する）
