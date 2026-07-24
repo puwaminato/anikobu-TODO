@@ -86,12 +86,13 @@ let trashMode = false;
 let ideas = [];
 let trash = [];
 let pickedIdeaId = null;
+let checkedIdeaIds = new Set();
 
 function otherName() {
   return NAMES.find((n) => n !== myName) || '相手';
 }
 
-// 記念日（2025年12月28日）を1日目とした経過日数を表示する
+// 記念日(2025年12月28日)を1日目とした経過日数を表示する
 function renderFooter() {
   const today = new Date();
   const a = new Date(ANNIVERSARY_DATE.getFullYear(), ANNIVERSARY_DATE.getMonth(), ANNIVERSARY_DATE.getDate());
@@ -101,7 +102,7 @@ function renderFooter() {
   versionLineEl.textContent = `Ver.${APP_VERSION}`;
 }
 
-// 標準表示（未達成・ふたり・検索なし・他ビューを開いていない）のときだけ手動並び替えを許可する
+// 標準表示(未達成・ふたり・検索なし・他ビューを開いていない)のときだけ手動並び替えを許可する
 function dragEnabled() {
   return (
     !calendarMode &&
@@ -122,7 +123,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-// タップ位置に波紋を出す（録画時などにタップ箇所が分かるように）
+// タップ位置に波紋を出す(録画時などにタップ箇所が分かるように)
 function spawnRipple(x, y, size) {
   const ripple = document.createElement('span');
   ripple.className = 'tap-ripple';
@@ -231,14 +232,14 @@ function renderCurrentView() {
   }
 }
 
-// タブバーの選択状態を見た目に反映する（該当なし＝カレンダー表示中は null）
+// タブバーの選択状態を見た目に反映する(該当なし＝カレンダー表示中は null)
 function updateViewTabs(activeView) {
   viewTabBtns.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === activeView);
   });
 }
 
-// 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする（切り替え前の下準備）
+// 一覧・カレンダー・思いつきメモ・ゴミ箱の各ビューを非表示にする(切り替え前の下準備)
 function closeAllViews() {
   calendarMode = false;
   ideasMode = false;
@@ -444,6 +445,7 @@ async function addIdea(text) {
 async function deleteIdea(id) {
   await fetch('/api/ideas/' + id, { method: 'DELETE' });
   ideas = ideas.filter((i) => i.id !== id);
+  checkedIdeaIds.delete(id);
   renderIdeas();
 }
 
@@ -455,6 +457,7 @@ async function moveIdeaToList(id, keepOriginal) {
   });
   if (!keepOriginal) {
     ideas = ideas.filter((i) => i.id !== id);
+    checkedIdeaIds.delete(id);
     renderIdeas();
   }
   await fetchItems();
@@ -800,8 +803,12 @@ calDayItems.addEventListener('click', handleItemClick);
 // ---- 思いつきメモ ----
 function ideaToHtml(idea) {
   const highlightClass = idea.id === pickedIdeaId ? 'highlighted' : '';
+  const checked = checkedIdeaIds.has(idea.id) ? 'checked' : '';
   return `
     <li class="idea-item ${highlightClass}" data-id="${escapeHtml(idea.id)}">
+      <div class="idea-item-checkbox-wrap">
+        <input type="checkbox" class="idea-item-checkbox" title="ランダム抽選の候補にする" ${checked}>
+      </div>
       <div class="idea-item-body">
         <div class="idea-item-text">${escapeHtml(idea.text)}</div>
         <div class="idea-item-meta">${escapeHtml(idea.addedBy)} ・ ${formatDate(idea.createdAt)}</div>
@@ -828,11 +835,12 @@ ideaAddForm.addEventListener('submit', (e) => {
 });
 
 ideaRandomBtn.addEventListener('click', () => {
-  if (!ideas.length) {
-    ideaPick.classList.add('hidden');
+  const candidates = ideas.filter((i) => checkedIdeaIds.has(i.id));
+  if (!candidates.length) {
+    alert('☑️ ランダムに選びたい候補にチェックを入れてください。');
     return;
   }
-  const picked = ideas[Math.floor(Math.random() * ideas.length)];
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
   pickedIdeaId = picked.id;
   ideaPick.classList.remove('hidden');
   ideaPick.textContent = `🎲 ${picked.text}`;
@@ -840,6 +848,15 @@ ideaRandomBtn.addEventListener('click', () => {
   renderIdeas();
   const li = ideaList.querySelector(`.idea-item[data-id="${picked.id}"]`);
   if (li) li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+ideaList.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('idea-item-checkbox')) return;
+  const li = e.target.closest('.idea-item');
+  if (!li) return;
+  const id = li.dataset.id;
+  if (e.target.checked) checkedIdeaIds.add(id);
+  else checkedIdeaIds.delete(id);
 });
 
 ideaList.addEventListener('click', (e) => {
