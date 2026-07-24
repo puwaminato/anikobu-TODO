@@ -549,6 +549,24 @@ app.get('/api/trash', async (req, res) => {
   res.json(combined);
 });
 
+// ゴミ箱から完全に削除する（やりたいことリスト・思いつきメモ両対応。復元不可）
+app.delete('/api/trash/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+  if (type === 'item') {
+    const item = (await getAllItems()).find((i) => i.id === id);
+    if (!item || !item.deletedAt) return res.status(404).json({ error: 'not found' });
+    await purgeItem(id);
+    return res.status(204).end();
+  }
+  if (type === 'idea') {
+    const idea = (await getAllIdeas()).find((i) => i.id === id);
+    if (!idea || !idea.deletedAt) return res.status(404).json({ error: 'not found' });
+    await removeIdea(id);
+    return res.status(204).end();
+  }
+  res.status(400).json({ error: 'invalid type' });
+});
+
 // ゴミ箱から元に戻す
 app.post('/api/items/:id/restore', async (req, res) => {
   const { id } = req.params;
